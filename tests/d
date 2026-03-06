@@ -1,0 +1,4 @@
+(set foo (fun ((a b c) (print a) (+ a b c))))
+(defun bar (a b c) (print a) (+ a b c))
+
+
