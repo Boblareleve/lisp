@@ -150,7 +150,7 @@ ssize_t list_count(Strv str)
                 }
             }
             while (str.size > 0 && Strv_first(str) != '"');
-            TRY(str.size > 0, error_log("unexpected EOF"));
+            GOTRY_consume(&str);
             count++;
             continue;
         }
@@ -193,8 +193,6 @@ bool list(Strv *str, List *li)
     
     skip_space(str);
     skip_comment(str);
-    
-
 
     if (Strv_first(*str) == '(')
     {
@@ -208,7 +206,7 @@ bool list(Strv *str, List *li)
         if (Strv_first(*str) == ')')
         {
             *li = NIL_LIST;
-            Strv_inc(str);
+            Strv_inc(str); // can't be the end of file
             return true;
         }
 
@@ -222,7 +220,7 @@ bool list(Strv *str, List *li)
             skip_space(str);
         } while (li->list.size < count && str->size > 0 && Strv_first(*str) != ')');
         TRY(li->list.size == count, error_log("invalid list element count: %sv", &save));
-        TRY(Strv_first(*str) == ')', error_log("unexpected EOF"));
+        TRY(Strv_first(*str) == ')', error_log("unexpected EOF or underestimate list_count()"));
         Strv_inc(str);
         return true;
     }
@@ -241,14 +239,24 @@ bool list(Strv *str, List *li)
             return true;
         }
     }
-    if (Strv_first(*str) == '"') // string TODO escape
+    if (Strv_first(*str) == '"')
     {
+        TRY(consume(str));
+        char *begin = str->arr;
+        while (Strv_first(*str) != '"')
+        {
+            TRY(consume(str));
+            if (Strv_first(*str) == '\\')
+            {
+                TRY(consume(str));
+                TRY(consume(str));
+            }
+        }
         Strv_inc(str);
         *li = (List){
             .tag = tag_string,
-            .str = Strv_c_substr(str, '"')
+            .str = Strv_range(begin, str->arr)
         };
-        Strv_inc(str);
         return true;
     }
     if (Strv_first(*str) == '\'')
