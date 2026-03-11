@@ -2,3 +2,5 @@
 (defun bar (a b c) (print a) (+ a b c))
 
 
+(defun ((a b c) a))
+
