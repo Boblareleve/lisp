@@ -490,9 +490,10 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             return true;
         }
         TRY(set_Variable_get(&ctx->functions, key), 
-            error_log("unexpected function symbole: "STRV_FMT, STRV_UNPACK(key.name))
+            error_log("unexpected function symbole: %sv", &key.name)
         );
-    } return true;
+        error_log("no variable nor function named: %sv", &key.name);
+    } return false;
     case tag_list: {
 
         // nil|false
