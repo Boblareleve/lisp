@@ -413,9 +413,8 @@ bool eval_function(Lisp_context *ctx, const List li, List *out)
 {
     bool res = false;
 
-
     const List func_def = da_first(&li.list);
-    TRY(func_def.tag == tag_list);
+    TRY(func_def.tag == tag_list && func_def.list.size >= 2, error_log("not a function definition"));
 
     const List args_def = da_first(&func_def.list);
     TRY(args_def.tag == tag_list);
@@ -538,8 +537,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
 
             Variable var = {
                 .name = li.list.arr[1].str,
-                .value = li.list.arr[2]
             };
+            TRY(eval(ctx, li.list.arr[2], &var.value));
 
             // set or replace variable var.name
             *set_Variable_insert(&ctx->variables, var) = var;
