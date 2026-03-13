@@ -66,6 +66,7 @@ int is_end(int c)     { return c == ')' || isspace(c); }
 int not_is_end(int c) { return !is_end(c);             }
 
 
+
 bool is_unary_sign(char c)
 {
     return c == '+' || c == '-';
@@ -226,10 +227,10 @@ bool list(Strv *str, List *li)
             li->list.arr[li->list.size] = NIL_LIST;
             TRY(list(str, &li->list.arr[li->list.size]));
             li->list.size++;
-            skip_space(str);
+            skip_comment(str);
         } while (li->list.size < count && str->size > 0 && Strv_first(*str) != ')');
         TRY(li->list.size == count, error_log("invalid list element count, expected %d got %d with: %sv", count, li->list.size, &save));
-        TRY(Strv_first(*str) == ')', error_log("unexpected EOF or underestimate list_count()"));
+        TRY(Strv_first(*str) == ')', error_log("unexpected EOF or underestimate list_count() counted %d but there is more", count));
         Strv_inc(str);
         return true;
     }
@@ -261,11 +262,11 @@ bool list(Strv *str, List *li)
                 TRY(consume(str));
             }
         }
-        Strv_inc(str);
         *li = (List){
             .tag = tag_string,
             .str = Strv_range(begin, str->arr)
         };
+        Strv_inc(str);
         return true;
     }
     if (Strv_first(*str) == '\'')
@@ -325,7 +326,7 @@ bool _dump_indent(Strb *out, const List li, int indent)
             Strb_catf(out, "%f64", li.number);
     } break;
     case tag_symbole:   Strb_catf(out, STRV_FMT, STRV_UNPACK(li.str)); break;
-    case tag_string:    Strb_catf(out, "\""STRV_FMT"\"", STRV_UNPACK(li.str)); break;
+    case tag_string:    Strb_catf(out, STRV_FMT, STRV_UNPACK(li.str)); break;
     case tag_true:      Strb_cat(out, "true");              break;
     default:            Strb_cat(out, "UNKOWN");            break;
     }
@@ -584,7 +585,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 List li_to_print = {0};
                 TRY(eval(ctx, li.list.arr[i], &li_to_print), error_log("failed to eval to print"));
                 TRY(List_print(li_to_print), error_log("failed to print"));
-                printf("\t");
+                // printf("\t");
             }
             return true;
         }

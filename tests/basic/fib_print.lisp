@@ -14,6 +14,7 @@ t
     a
 ))
 (print (fib 9)) (print " == ") (print 34)
+(print "   ")
 (print (fib 4)) (print " == ") (print 3)
-
+(print "   ")
 t
