@@ -324,8 +324,8 @@ bool _dump_indent(Strb *out, const List li, int indent)
         else
             Strb_catf(out, "%f64", li.number);
     } break;
-    case tag_symbole:   Strb_catf(out, "%sv",     &li.str); break;
-    case tag_string:    Strb_catf(out, "\"%sv\"", &li.str); break;
+    case tag_symbole:   Strb_catf(out, STRV_FMT, STRV_UNPACK(li.str)); break;
+    case tag_string:    Strb_catf(out, "\""STRV_FMT"\"", STRV_UNPACK(li.str)); break;
     case tag_true:      Strb_cat(out, "true");              break;
     default:            Strb_cat(out, "UNKOWN");            break;
     }
