@@ -62,7 +62,7 @@ void skip_comment(Strv *str)
 }
 
 
-int is_end(int c)     { return c == ')' || isspace(c); }
+int is_end(int c)     { return c == '(' || c == ')' || isspace(c); }
 int not_is_end(int c) { return !is_end(c);             }
 
 
@@ -164,8 +164,9 @@ ssize_t list_count(Strv str)
         if (Strv_first(str) == '\'') // reference
         {
             do GOTRY_consume(&str); while (Strv_first(str) == '\'');
-            skip_comment(&str);
-            GOTRY(str.size > 0, error_log("expected atom after reference (') got EOF"));
+            continue;
+            // skip_comment(&str);
+            // GOTRY(str.size > 0, error_log("expected atom after reference (') got EOF"));
         }
 
 
@@ -479,7 +480,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
 
     // execute statements
     for (int i = 1; i+1 < func_def.list.size; i++)
-        GOTRY(eval(ctx, func_def.list.arr[i], &NIL_LIST));
+        GOTRY(eval(ctx, func_def.list.arr[i], out));
     
     // return the last one
     GOTRY(eval(ctx, da_top(&func_def.list), out));
@@ -637,11 +638,15 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 TRY(eval(ctx, li.list.arr[1], &cond));
                 
                 if (IS_NIL(cond))
-                    break;
+                break;
                 for (int i = 2; i < li.list.size; i++)
-                    TRY(eval(ctx, li.list.arr[i], out));
+                TRY(eval(ctx, li.list.arr[i], out));
             }
             return true;
+        }
+        if (Strv_equal_lit(op.str, "return"))
+        {
+            TODO("return");
         }
         if (Strv_equal_lit(op.str, "+"))
         {
