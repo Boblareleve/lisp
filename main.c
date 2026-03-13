@@ -36,14 +36,13 @@ bool test_eval(const da_List lis)
     }
     TRY(List_equal(expect, tmp),
         printf("unexpected result got: ");
-        print(tmp);
+        List_print(tmp);
         printf("  expecting: ");
-        print(expect);
+        List_print(expect);
         printf("\t");
         error.size = 0;
     );
-    // print(tmp);
-    // printf("\t");
+
     return true;
 }
 bool test(const Strv str)
@@ -68,16 +67,35 @@ bool test(const Strv str)
             error.size = 0;
         );
     }
-    // da_for (List, it, &lis)
-    // {
-    //     print(*it);
-    //     printf("\n");
-    // }
-    // printf("-------------\n");
+    
+    // copy
+    da_List cpy = {0};
+    da_for (List, it, &lis)
+        da_push(&cpy, List_copy(*it));
+    
+    
+    // run
     const int samples = 1;
     for (int _ = 0; _ < samples; _++)
         TRY(test_eval(lis));
+
+    bool some_changes = false;
+    for (size_t i = 0; i < cpy.size; i++)
+        if (!List_equal(cpy.arr[i], lis.arr[i])) 
+        {
+            printf("code have change\t");
+            some_changes = true;
+        }
+    if (!some_changes) printf("no code changes\t");
+    
+    da_for (List, it, &lis)
+        List_free(it);
     da_free(&lis);
+
+    da_for (List, it, &cpy)
+        List_free(it);
+    da_free(&cpy);
+
     error.size = 0;
     return true;
 }
@@ -94,7 +112,7 @@ int main(int argc, char **argv)
             continue ;
         }
         
-        printf("TEST %s\t", argv[i]);
+        printf("TEST %-*s\t", 48, argv[i]);
         if (!test(raw.view))
             printf("\tFAILURE\n");
         else
@@ -127,7 +145,7 @@ bool test_parse(Strv str)
             error.size = 0;
         );
         printf("parse sucess:\n");
-        print(da_top(&lis));
+        List_print(da_top(&lis));
         printf("\n");
     }
 

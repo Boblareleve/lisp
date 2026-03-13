@@ -78,10 +78,11 @@ do {\
 
 bool list(Strv *str, List *li);
 bool dump(Strb *out, const List li);
-bool print(const List li);
+bool List_print(const List li);
 bool eval(Lisp_context *ctx, const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
+List List_copy(const List li);
 void Lisp_context_free(Lisp_context *ctx);
 
 void skip_space(Strv *str);
