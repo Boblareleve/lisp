@@ -660,25 +660,20 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
-        /* if (Strv_equal_lit(op.str, "!"))
+        if (Strv_equal_lit(op.str, "!"))
         {
             TRY(li.list.size >= 2, error_log("expected at least 2 elements for '==' got %d", li.list.size));
             
-            List acc = {0};
-            TRY(eval(ctx, li.list.arr[1], &acc));
-            
-            for (int i = 2; i < li.list.size; i++)
-            {
-                List operand = {0};
-                TRY(eval(ctx, li.list.arr[i], &operand));
-                
-                if (!List_equal(acc, operand))
-                    return true; // out is already set to nil 
-                
-            }
-            *out = TRUE_LIST;
+            List res = {0};
+            TRY(eval(ctx, li.list.arr[1], &res));
+            if (res.tag == tag_true)
+                *out = NIL_LIST;
+            else if (res.tag == tag_list && res.list.size == 0)
+                *out = TRUE_LIST;
+            else
+                return false;
             return true;
-        } */
+        }
         if (Strv_equal_lit(op.str, "&&"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '&&' got %d", li.list.size));
