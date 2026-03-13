@@ -13,7 +13,7 @@ t
     )
     a
 ))
-(&&
-    (== (fib 9) 34)
-    (== (fib 4) 3)
-)
+(print (fib 9)) (print " == ") (print 34)
+(print (fib 4)) (print " == ") (print 3)
+
+t

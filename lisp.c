@@ -303,6 +303,41 @@ bool _dump_indent(Strb *out, const List li, int indent)
     Strb_cat_nchar(out, indent, ' ');
     switch (li.tag)
     {
+    case tag_list: {
+        if (li.list.size == 0)
+        {
+            Strb_cat(out, "()");
+            break;
+        }
+        Strb_catf(out, "(\n", li.list.size);
+        da_for (const List, it, &li.list)
+        {
+            TRY(_dump_indent(out, *it, indent + 2));
+            Strb_cat(out, "\n");
+        }
+        Strb_cat_nchar(out, indent, ' ');
+        Strb_cat(out, ")");
+    } break;
+    case tag_number: {
+        if (fmod(li.number, 1.0) == 0.0)
+            Strb_catf(out, "%.0f64", li.number);
+        else
+            Strb_catf(out, "%f64", li.number);
+    } break;
+    case tag_symbole:   Strb_catf(out, "%sv",     &li.str); break;
+    case tag_string:    Strb_catf(out, "\"%sv\"", &li.str); break;
+    case tag_true:      Strb_cat(out, "true");              break;
+    default:            Strb_cat(out, "UNKOWN");            break;
+    }
+    return true;
+}
+bool _dump_type_indent(Strb *out, const List li, int indent)
+{
+    TRY(out, error_log("no output Strb"));
+
+    Strb_cat_nchar(out, indent, ' ');
+    switch (li.tag)
+    {
     case tag_symbole: {
         Strb_catf(out, "symbole: '"STRV_FMT"'", STRV_UNPACK(li.str));
     } break;
@@ -315,7 +350,7 @@ bool _dump_indent(Strb *out, const List li, int indent)
         Strb_catf(out, "(list {%d}:\n", li.list.size);
         da_for (const List, it, &li.list)
         {
-            TRY(_dump_indent(out, *it, indent + 2));
+            TRY(_dump_type_indent(out, *it, indent + 2));
             Strb_cat(out, "\n");
         }
         Strb_cat_nchar(out, indent, ' ');
@@ -520,6 +555,9 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(eval_function(ctx, li, NULL, out), error_log("failed to call inline function"));
             return true;
         }
+
+        // TODO transform into an prefect hash table
+        // uint16_t a = *(uint16_t)&op.str.arr;
 
         if (Strv_equal_lit(op.str, "?"))
         {
@@ -769,6 +807,32 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             }
             return true; // out is already set to nil (false)
         }
+        if (Strv_equal_lit(op.str, "first"))
+        {
+            TRY(li.list.size == 2);
+            TRY(li.list.arr[1].tag == tag_list);
+
+            *out = li.list.arr[1];
+            return true;
+        }
+        if (Strv_equal_lit(op.str, "next"))
+        {
+            TRY(li.list.size == 2);
+            List to_get_next = li.list.arr[1];
+            TRY(to_get_next.tag == tag_list);
+
+            if (to_get_next.list.size > 1)
+                *out = (List){
+                    .tag = tag_list,
+                    .list = {
+                        .arr = &to_get_next.list.arr[1],
+                        .size = to_get_next.list.size-1
+                    }
+                };
+            return true;
+        }
+        
+
 
         { // variable or function
             Variable *var_fun;
