@@ -9,28 +9,29 @@
 #include "ar.h"
 
 
+enum List_tag {
+    tag_list = 0,  // (a a a)|()
+    tag_true,      // t
+    tag_symbole,   // 
+    tag_string,    // "dslmjkfdsqml"
+    tag_number,    // 4326324 3.3
+};
+typedef uint16_t List_tag;
+
 
 #define NIL_LIST (List){0}
 #define TRUE_LIST (List){ .tag = tag_true }
 #define IS_NIL(li) ((li).tag == tag_list && (li).list.size == 0)
 typedef struct List
 {
-    enum {
-        tag_list = 0,  // (a a a)|()
-        tag_true,      // t
-        tag_symbole,   // 
-        tag_string,    // "dslmjkfdsqml"
-        tag_number,    // 4326324
-        // tag_reference, // ?
-        // tag_function   // (foo )
-    } tag;
-    uint32_t reference_count; // how many reference depth it is
+    List_tag tag;
+    uint16_t quote_count; // how many reference "(QUOTE self)" depth it is
+    uint32_t ref_count;   // smart pointer
     union {
         struct {
             struct List *arr;
             size_t size;
         } list;
-        // struct List *ref;
         Strv str;
         double number;
     };

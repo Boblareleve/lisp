@@ -270,7 +270,7 @@ bool list(Strv *str, List *li)
         do TRY(consume(str)); while (Strv_first(*str) == '\'');
 
         TRY(list(str, li));
-        li->reference_count = count;
+        li->quote_count = count;
         
         return true;
     }
@@ -460,10 +460,10 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     *out = NIL_LIST;
 
     // dec ref count
-    if (li.reference_count)
+    if (li.quote_count)
     {
         *out = li;
-        out->reference_count--;
+        out->quote_count--;
         return true;
     }
 
@@ -801,3 +801,15 @@ void List_free(List *li)
         free(li->list.arr);
     }
 }
+
+
+void Lisp_context_free(Lisp_context *ctx)
+{
+    // da_for (da_Variable, it, &ctx->args_stack)
+    //     da_free(it);
+    da_free(&ctx->args_stack);
+    
+    set_Variable_free(&ctx->variables);
+    set_Variable_free(&ctx->functions);
+}
+

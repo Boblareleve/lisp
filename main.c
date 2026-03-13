@@ -12,39 +12,42 @@ bool test_eval(const da_List lis)
             List tmp = {0};
             if (!eval(&ctx, lis.arr[i], &tmp))
             {
-                // printf("(err)\t"); // : "STRV_FMT")\t", STRV_UNPACK(Strv_slice(error.view, -16, -1)));
+                Lisp_context_free(&ctx);
                 return true;
             }
         }
-        printf("no error while expecting one\t");        
-        return false;
+        printf("no error while expecting one\t");
+        goto fail;
     }
     List expect = {0};
-    TRY(eval(&ctx, da_first(&lis), &expect), 
+    GOTRY(eval(&ctx, da_first(&lis), &expect), 
         printf("eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view));
-        error.size = 0;
     );
     // last expected to be equal to "expect"
     List tmp = (List){0};
     for (int i = 1; i < lis.size; i++)
     {
         tmp = (List){0};
-        TRY(eval(&ctx, lis.arr[i], &tmp), 
+        GOTRY(eval(&ctx, lis.arr[i], &tmp), 
             printf("unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view));
-            error.size = 0;
         );
     }
-    TRY(List_equal(expect, tmp),
+    GOTRY(List_equal(expect, tmp),
         printf("unexpected result got: ");
         List_print(tmp);
         printf("  expecting: ");
         List_print(expect);
         printf("\t");
-        error.size = 0;
     );
 
+    Lisp_context_free(&ctx);
     return true;
+fail:
+    Lisp_context_free(&ctx);
+    error.size = 0;
+    return false;
 }
+
 bool test(const Strv str)
 {
     if (str.size == 0)
@@ -62,42 +65,57 @@ bool test(const Strv str)
         if (it.size <= 0) break;
 
         da_push_zero(&lis);
-        TRY(list(&it, &da_top(&lis)),
+        GOTRY(list(&it, &da_top(&lis)),
             printf("parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
-            error.size = 0;
         );
     }
     
     // copy
+
     da_List cpy = {0};
-    da_for (List, it, &lis)
-        da_push(&cpy, List_copy(*it));
+    bool do_copy = false;
+    if (do_copy)
+    {
+        da_for (List, it, &lis)
+            da_push(&cpy, List_copy(*it));
+    }
     
     
     // run
     const int samples = 1;
     for (int _ = 0; _ < samples; _++)
-        TRY(test_eval(lis));
+        GOTRY(test_eval(lis));
 
-    bool some_changes = false;
-    for (size_t i = 0; i < cpy.size; i++)
-        if (!List_equal(cpy.arr[i], lis.arr[i])) 
-        {
-            printf("code have change\t");
-            some_changes = true;
-        }
-    if (!some_changes) printf("no code changes\t");
+    
+    if (do_copy)
+    {
+        bool some_changes = false;
+        for (size_t i = 0; i < cpy.size; i++)
+            if (!List_equal(cpy.arr[i], lis.arr[i])) 
+            {
+                printf("code have change\t");
+                some_changes = true;
+            }
+        if (!some_changes) printf("no code changes\t");
+    }
     
     da_for (List, it, &lis)
         List_free(it);
     da_free(&lis);
 
-    da_for (List, it, &cpy)
-        List_free(it);
-    da_free(&cpy);
+    if (do_copy)
+    {
+        da_for (List, it, &cpy)
+            List_free(it);
+        da_free(&cpy);
+    }
 
     error.size = 0;
     return true;
+fail:
+    error.size = 0;
+    da_free(&lis);
+    return false;
 }
 
 
