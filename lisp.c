@@ -126,6 +126,8 @@ ssize_t list_count(Strv str)
     GOTRY(Strv_first(str) == '(');
     GOTRY_consume(&str);
     skip_comment(&str);
+    GOTRY(str.size > 0);
+
 
     ssize_t count = 0;
     while (Strv_first(str) != ')')
@@ -153,6 +155,8 @@ ssize_t list_count(Strv str)
             }
             while (str.size > 0 && Strv_first(str) != '"');
             GOTRY_consume(&str);
+            skip_comment(&str);
+            GOTRY(str.size > 0);
             count++;
             continue;
         }
@@ -165,6 +169,8 @@ ssize_t list_count(Strv str)
 
 
         GOTRY(skip_atom(&str));
+        skip_comment(&str);
+        GOTRY(str.size > 0);
         count++;
     }
 
@@ -517,10 +523,19 @@ bool eval(Lisp_context *ctx, const List li, List *out)
 
         if (Strv_equal_lit(op.str, "?"))
         {
-            TRY(li.list.size == 4, error_log("expected 4 element for 'if' got %d", li.list.size));
+            TRY(li.list.size == 4, error_log("expected 4 element for '?' got %d", li.list.size));
             List cond = {0};
             TRY(eval(ctx, li.list.arr[1], &cond));
             return eval(ctx, li.list.arr[(!IS_NIL(cond)) ? 2 : 3], out);
+        }
+        if (Strv_equal_lit(op.str, "if"))
+        {
+            TRY(li.list.size == 3, error_log("expected 3 element for 'if' got %d", li.list.size));
+            List cond = {0};
+            TRY(eval(ctx, li.list.arr[1], &cond));
+            if (!IS_NIL(cond))
+                return eval(ctx, li.list.arr[2], out);
+            return true;
         }
         if (Strv_equal_lit(op.str, "print"))
         {
@@ -531,7 +546,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 List li_to_print = {0};
                 TRY(eval(ctx, li.list.arr[i], &li_to_print), error_log("failed to eval to print"));
                 TRY(List_print(li_to_print), error_log("failed to print"));
-                printf("\n");
+                printf("\t");
             }
             return true;
         }
@@ -545,6 +560,15 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             };
             TRY(eval(ctx, li.list.arr[2], &var.value));
 
+            // first look in the stack frame
+            if (ctx->args_stack.size > 0)
+                da_for (Variable, it, &da_top(&ctx->args_stack))
+                    if (Strv_equal(it->name, var.name))
+                    {
+                        it->value = var.value;
+                        return true;
+                    }
+            
             // set or replace variable var.name
             *set_Variable_insert(&ctx->variables, var) = var;
             
@@ -563,6 +587,21 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             // set or replace function var.name
             *set_Variable_insert(&ctx->functions, var) = var;
             
+            return true;
+        }
+        if (Strv_equal_lit(op.str, "while"))
+        { // return last value of the body and of the last iteration or () if no body
+            TRY(li.list.size >= 2); // the condition can have side effects
+            for (;;)
+            {
+                List cond = {0};
+                TRY(eval(ctx, li.list.arr[1], &cond));
+                
+                if (IS_NIL(cond))
+                    break;
+                for (int i = 2; i < li.list.size; i++)
+                    TRY(eval(ctx, li.list.arr[i], out));
+            }
             return true;
         }
         if (Strv_equal_lit(op.str, "+"))
@@ -660,6 +699,24 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
+        if (Strv_equal_lit(op.str, "!="))
+        {
+            TRY(li.list.size >= 3, error_log("expected at least 2 elements for '!=' got %d", li.list.size));
+            
+            List acc = {0};
+            TRY(eval(ctx, li.list.arr[1], &acc));
+            
+            for (int i = 2; i < li.list.size; i++)
+            {
+                List operand = {0};
+                TRY(eval(ctx, li.list.arr[i], &operand));
+                
+                if (List_equal(acc, operand))
+                    return true; // out is already set to nil 
+            }
+            *out = TRUE_LIST;
+            return true;
+        }
         if (Strv_equal_lit(op.str, "!"))
         {
             TRY(li.list.size >= 2, error_log("expected at least 2 elements for '==' got %d", li.list.size));
@@ -712,7 +769,6 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             }
             return true; // out is already set to nil (false)
         }
-        
 
         { // variable or function
             Variable *var_fun;
