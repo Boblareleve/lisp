@@ -778,12 +778,14 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             List res = {0};
             TRY(eval(ctx, li.list.arr[1], &res));
-            if (res.tag == tag_true)
-                *out = NIL_LIST;
-            else if (res.tag == tag_list && res.list.size == 0)
+            if (IS_NIL(res))
                 *out = TRUE_LIST;
-            else
-                return false;
+            // if (res.tag == tag_true)
+            //     *out = NIL_LIST;
+            // else if (res.tag == tag_list && res.list.size == 0)
+            //     *out = TRUE_LIST;
+            // else
+            //     return false;
             return true;
         }
         if (Strv_equal_lit(op.str, "&&"))
