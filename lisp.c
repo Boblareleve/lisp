@@ -5,7 +5,6 @@
 #include "lisp.h"
 
 
-
 Strb error = {0};
 
 #define VAR_IS_NULL(var)  ((var).name.arr == NULL)
@@ -63,7 +62,7 @@ void skip_comment(Strv *str)
 
 
 int is_end(int c)     { return c == '(' || c == ')' || isspace(c); }
-int not_is_end(int c) { return !is_end(c);             }
+int not_is_end(int c) { return !is_end(c); }
 
 
 
@@ -195,8 +194,7 @@ void test_list_count(void)
 
 bool list(Strv *str, List *li)
 {
-    // test_list_count(); // TODO rm
-
+    
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
     TRY(str->size > 0, error_log("empty input"));
@@ -478,13 +476,21 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
         GOTRY(eval(ctx, li.list.arr[i+1], &da_top(&da_top(&ctx->args_stack)).value));
     }
 
+    // int stack_frame_index = ctx->args_stack.size;
     // execute statements
     for (int i = 1; i+1 < func_def.list.size; i++)
-        GOTRY(eval(ctx, func_def.list.arr[i], out));
+        if (!eval(ctx, func_def.list.arr[i], out) && ctx->in_return)
+        { // return have been call
+            error.size = 0;         // reset error need to find solution for that
+            ctx->in_return = false; // not in return anymore
+            res = true;
+            goto end; // terminate
+        }
     
     // return the last one
     GOTRY(eval(ctx, da_top(&func_def.list), out));
-
+    
+end:
     res = true;
 fail:
     if (da_top(&ctx->args_stack).size > 0)
@@ -646,7 +652,12 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         }
         if (Strv_equal_lit(op.str, "return"))
         {
-            TODO("return");
+            TRY(li.list.size == 1 || li.list.size == 2);
+            if (li.list.size == 2)
+                TRY(eval(ctx, li.list.arr[1], out));
+            
+            ctx->in_return = true;
+            return false;
         }
         if (Strv_equal_lit(op.str, "+"))
         {

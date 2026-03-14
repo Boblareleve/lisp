@@ -1,6 +1,8 @@
 #ifndef LISP_H
 #define LISP_H
 
+// #define LISP_DEBUG_INFO
+
 #include "Str.h"
 #include "da.h"
 #include "utils.h"
@@ -17,7 +19,7 @@ enum List_tag {
     tag_string,    // "dslmjkfdsqml"
     tag_number,    // 4326324 3.3
 };
-typedef uint16_t List_tag;
+typedef uint8_t List_tag;
 
 
 #define NIL_LIST (List){0}
@@ -26,8 +28,14 @@ typedef uint16_t List_tag;
 typedef struct List
 {
     List_tag tag;
-    uint16_t quote_count; // how many reference "(QUOTE self)" depth it is
-    uint32_t ref_count;   // smart pointer
+    uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
+    uint16_t ref_count;   // smart pointer
+/* #ifdef LISP_DEBUG_INFO
+    struct {
+        uint16_t lign;
+        uint16_t character;
+    } debug_info;
+#endif */
     union {
         struct {
             struct List *arr;
@@ -37,6 +45,7 @@ typedef struct List
         double number;
     };
 } List;
+static_assert(sizeof(List) == 24);
 
 
 typedef struct Variable
@@ -49,7 +58,6 @@ DA_TYPEDEF_ARRAY(Variable);
 SET_TYPEDEF_HASH_SET(Variable);
 
 
-
 DA_TYPEDEF_ARRAY(da_Variable);
 typedef struct Lisp_context
 {
@@ -59,11 +67,10 @@ typedef struct Lisp_context
 
     // stack (local)
     da_da_Variable args_stack;
-
+    bool in_return; // indicate that the error is only a return mechanism
 
     // Strb error;
 } Lisp_context;
-
 
 
 extern Strb error;
