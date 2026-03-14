@@ -48,6 +48,9 @@ fail:
     return false;
 }
 
+
+Ar arena = {0};
+
 bool test(const Strv str)
 {
     if (str.size == 0)
@@ -65,7 +68,7 @@ bool test(const Strv str)
         if (it.size <= 0) break;
 
         da_push_zero(&lis);
-        GOTRY(list(&it, &da_top(&lis)),
+        GOTRY(list(&arena, &it, &da_top(&lis)),
             printf("parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
         );
     }
@@ -77,7 +80,7 @@ bool test(const Strv str)
     if (do_copy)
     {
         da_for (List, it, &lis)
-            da_push(&cpy, List_copy(*it));
+            da_push(&cpy, List_copy(&arena, *it));
     }
     
     
@@ -142,56 +145,3 @@ int main(int argc, char **argv)
     return 0;
 }
 
-/* 
-DA_TYPEDEF_ARRAY(List);
-bool test_parse(Strv str)
-{
-    printf("\n");
-    da_List lis = {0};
-    Strv it = *(Strv*)&str;
-    while (it.size > 0)
-    {
-        skip_space(&it);
-        if (Strv_first(it) == ';')
-        {
-            skip_comment(&it);
-            continue;
-        }
-        da_push_zero(&lis);
-        TRY(list(&it, &da_top(&lis)),
-            printf("parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
-            error.size = 0;
-        );
-        printf("parse sucess:\n");
-        List_print(da_top(&lis));
-        printf("\n");
-    }
-
-    return true;
-}
-
-
-
-int main(int argc, char **argv)
-{
-    for (int i = 1; i < argc; i++)
-    {
-        Strb raw = {0};
-        if (Strb_cat_file(&raw, argv[i]))
-        {
-            fprintf(stderr, "[TEST] file '%s' not found\n", argv[i]);
-            continue ;
-        }
-        
-        printf("TEST %s\t", argv[i]);
-        if (!test_parse(raw.view))
-            ; //printf("\tFAILURE\n");
-        // else
-            // printf("SUCCESS\n");
-        
-
-        Strb_free(raw);
-    }
-    return 0;
-}
- */

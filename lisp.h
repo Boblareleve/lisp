@@ -42,6 +42,7 @@ typedef struct List
             size_t size;
         } list;
         Strv str;
+        // int64_t number; // double ?
         double number;
     };
 } List;

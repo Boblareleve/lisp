@@ -274,6 +274,7 @@ bool list(Ar *arena, Strv *str, List *li)
         *li = (List){
             .tag = tag_number,
             .number = strtod(str->arr, &it)
+            // .number = strtoll(str->arr, &it, 10)
         };
         if (it != str->arr)
         {
@@ -494,12 +495,16 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     TRY(args_def.list.size == li.list.size - 1, error_log("expected %d arguments got %d", args_def.list.size, li.list.size-1));
     
     // push args with their names in stack
-    da_push_zero(&ctx->args_stack);
-    for (int i = 0; i < args_def.list.size; i++)
+    // da_push_zero(&ctx->args_stack);
     {
-        // TODO set_stack_Variable ?
-        da_push(&da_top(&ctx->args_stack), (Variable){ .name = args_def.list.arr[i].str });
-        GOTRY(eval(ctx, li.list.arr[i+1], &da_top(&da_top(&ctx->args_stack)).value));
+        da_Variable new_frame = {0};
+        for (int i = 0; i < args_def.list.size; i++)
+        {
+            // TODO set_stack_Variable ?
+            da_push(&new_frame, (Variable){ .name = args_def.list.arr[i].str });
+            GOTRY(eval(ctx, li.list.arr[i+1], &da_top(&new_frame).value));
+        }
+        da_push(&ctx->args_stack, new_frame);
     }
 
     // execute statements
@@ -521,7 +526,8 @@ fail:
     if (da_top(&ctx->args_stack).size > 1) // first stack frame should never be pop
     {
         da_free(&da_top(&ctx->args_stack));
-        da_top(&ctx->args_stack).size--;
+        // da_top(&ctx->args_stack).size--;
+        ctx->args_stack.size--;
     }
     return res;
 }
@@ -756,6 +762,26 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 TRY(operand.tag == tag_number, error_log("expected a number to divide got %s", tag_to_string(operand.tag)));
                 
                 res.number /= operand.number;
+            }
+            *out = res;
+            return true;
+        }
+        if (Strv_equal_lit(op.str, "//"))
+        {
+            TRY(li.list.size >= 3, error_log("expected at least 2 elements for '//' got %d", li.list.size));
+            List res = {0};
+            TRY(eval(ctx, li.list.arr[1], &res));
+            TRY(res.tag == tag_number);
+
+            for (int i = 2; i < li.list.size; i++)
+            {
+                List operand = {0};
+                
+                TRY(eval(ctx, li.list.arr[i], &operand));
+                TRY(operand.tag == tag_number, error_log("expected a number to divide integer got %s", tag_to_string(operand.tag)));
+                
+                res.number /= operand.number;
+                res.number = round(res.number);
             }
             *out = res;
             return true;
