@@ -449,6 +449,22 @@ Variable *get_variable_in_stack(Lisp_context *ctx, Variable name)
 }
 
 
+// return true if it remplace an exsiting variable false if it push 
+Variable *set_stack_Variable(Lisp_context *ctx, Variable var)
+{
+    assert(ctx->args_stack.size > 0);
+
+    da_Variable *frame = &da_top(&ctx->args_stack);
+
+    da_for (Variable, it, frame)
+        if (Strv_equal(it->name, var.name))
+        {
+            *it = var; 
+            return it;
+        }
+    da_push(frame, var);
+    return &da_top(frame);
+}
 
 // li: (((args_def ...) statements ...) args_call)
 // or
@@ -469,14 +485,11 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     da_push_zero(&ctx->args_stack);
     for (int i = 0; i < args_def.list.size; i++)
     {
-        da_push_struct(&da_top(&ctx->args_stack), Variable, 
-            .name = args_def.list.arr[i].str,
-            // .value = li.list.arr[i+1]
-        );
+        // TODO set_stack_Variable ?
+        da_push(&da_top(&ctx->args_stack), (Variable){ .name = args_def.list.arr[i].str });
         GOTRY(eval(ctx, li.list.arr[i+1], &da_top(&da_top(&ctx->args_stack)).value));
     }
 
-    // int stack_frame_index = ctx->args_stack.size;
     // execute statements
     for (int i = 1; i+1 < func_def.list.size; i++)
         if (!eval(ctx, func_def.list.arr[i], out) && ctx->in_return)
@@ -493,7 +506,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
 end:
     res = true;
 fail:
-    if (da_top(&ctx->args_stack).size > 0)
+    if (da_top(&ctx->args_stack).size > 1) // first stack frame should never be pop
     {
         da_free(&da_top(&ctx->args_stack));
         da_top(&ctx->args_stack).size--;
@@ -849,6 +862,29 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 *out = NIL_LIST;
             return true;
         }
+        if (Strv_equal_lit(op.str, "for"))
+        {
+            TRY(li.list.size >= 4);
+            TRY(li.list.arr[1].tag == tag_symbole);
+            
+            List iterable = {0};
+            TRY(eval(ctx, li.list.arr[2], &iterable));
+            TRY(iterable.tag == tag_list);
+
+            Variable *it = set_stack_Variable(ctx, (Variable){ .name = li.list.arr[1].str });
+            for (int i = 0; i < iterable.list.size; i++)
+            {
+                it->value = iterable.list.arr[i];
+
+                for (int j = 3; j < li.list.size; j++)
+                {
+                    TRY(eval(ctx, li.list.arr[j], out));
+                }
+
+            }
+            
+            return true;
+        }
         
         { // variable or function
             Variable *var_fun;
@@ -934,11 +970,20 @@ void List_free(List *li)
 }
 
 
+Lisp_context Lisp_context_init(void)
+{
+    Lisp_context res = {0};
+    da_push_zero(&res.args_stack);
+
+    return res;
+}
+
 void Lisp_context_free(Lisp_context *ctx)
 {
     // da_for (da_Variable, it, &ctx->args_stack)
     //     da_free(it);
     da_free(&ctx->args_stack);
+    // da_free(&ctx->for_stack);
     
     set_Variable_free(&ctx->variables);
     set_Variable_free(&ctx->functions);

@@ -3,7 +3,7 @@
 DA_TYPEDEF_ARRAY(List);
 bool test_eval(const da_List lis)
 {
-    Lisp_context ctx = {0};
+    Lisp_context ctx = Lisp_context_init();
     if (da_first(&lis).tag == tag_symbole 
      && Strv_equal_lit(da_first(&lis).str, "ERROR")
     ) { // expect error
