@@ -9,7 +9,7 @@
 #include "sets.h"
 #include <stdlib.h>
 #include <setjmp.h>
-#include "ar.h"
+#include "ar_virt.h"
 
 
 enum List_tag {
@@ -67,7 +67,6 @@ typedef struct Lisp_context
 
     // stack (local)
     da_da_Variable args_stack;
-    // da_Variable for_stack; // only for loop iterator
     bool in_return; // indicate that the error is only a return mechanism
 
     // Strb error;
@@ -86,13 +85,13 @@ do {\
 
 
 
-bool list(Strv *str, List *li);
+bool list(Ar *arena, Strv *str, List *li);
 bool dump(Strb *out, const List li);
 bool List_print(const List li);
 bool eval(Lisp_context *ctx, const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
-List List_copy(const List li);
+List List_copy(Ar *arena, const List li);
 Lisp_context Lisp_context_init(void);
 void Lisp_context_free(Lisp_context *ctx);
 

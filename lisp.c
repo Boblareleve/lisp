@@ -192,9 +192,41 @@ void test_list_count(void)
     
 }
 
-bool list(Strv *str, List *li)
+
+Strv escaping(Ar *arena, Strv str)
 {
-    
+    Strv res = Strv_make(Ar_alloc_align(arena, str.size * 2, sizeof(char)), 0);
+
+    for (int i = 0; i < str.size; i++)
+    {
+        if (str.arr[i] == '\\')
+        {
+            i++;
+            assert(i < str.size);
+            switch (str.arr[i])
+            {
+            case '\\': res.arr[res.size++] = '\\'; break;
+            case 'n':  res.arr[res.size++] = '\n'; break;
+            case 't':  res.arr[res.size++] = '\t'; break;
+            case 'r':  res.arr[res.size++] = '\r'; break;
+            case 'v':  res.arr[res.size++] = '\v'; break;
+            case 'a':  res.arr[res.size++] = '\a'; break;
+            case 'b':  res.arr[res.size++] = '\b'; break;
+            case 'f':  res.arr[res.size++] = '\f'; break;
+            default:   res.arr[res.size++] = '?';  break; // unkown
+            }
+            continue;
+        }
+        res.arr[res.size++] = str.arr[i];
+    }
+
+    res.arr = Ar_realloc(arena, res.arr, str.size * 2, res.size);
+    assert(res.arr);
+    return res;
+}
+
+bool list(Ar *arena, Strv *str, List *li)
+{
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
     TRY(str->size > 0, error_log("empty input"));
@@ -220,11 +252,12 @@ bool list(Strv *str, List *li)
         }
 
         const Strv save = *str;
-        li->list.arr = malloc(count * sizeof(List));
+        
+        li->list.arr = Ar_alloc(arena, count * sizeof(List));
         li->list.size = 0;
         do {
             li->list.arr[li->list.size] = NIL_LIST;
-            TRY(list(str, &li->list.arr[li->list.size]));
+            TRY(list(arena, str, &li->list.arr[li->list.size]));
             li->list.size++;
             skip_comment(str);
         } while (li->list.size < count && str->size > 0 && Strv_first(*str) != ')');
@@ -261,9 +294,10 @@ bool list(Strv *str, List *li)
                 TRY(consume(str));
             }
         }
+
         *li = (List){
             .tag = tag_string,
-            .str = Strv_range(begin, str->arr)
+            .str = escaping(arena, Strv_range(begin, str->arr))
         };
         Strv_inc(str);
         return true;
@@ -275,7 +309,7 @@ bool list(Strv *str, List *li)
 
         do TRY(consume(str)); while (Strv_first(*str) == '\'');
 
-        TRY(list(str, li));
+        TRY(list(arena, str, li));
         li->quote_count = count;
         
         return true;
@@ -373,30 +407,21 @@ bool _dump_type_indent(Strb *out, const List li, int indent)
     return true;
 }
 
-bool _dump(Strb *out, const List li, int indent)
+bool dump(Strb *out, const List li)
 {
     TRY(out, error_log("no output Strb"));
 
-    Strb_cat_nchar(out, indent, ' ');
     switch (li.tag)
     {
-    case tag_symbole: {
-        Strb_catf(out, "'"STRV_FMT"'", STRV_UNPACK(li.str));
-    } break;
     case tag_list: {    
-        Strb_catf(out, "({%d}\n", li.list.size);
+        Strb_cat(out, "(");
         da_for (const List, it, &li.list)
         {
-            TRY(_dump(out, *it, indent + 2));
-            Strb_cat(out, "\n");
-            // if (it != &da_top(&li.list))   (a a a?)
-            //     Strb_cat_char(out, ' ');
+            TRY(dump(out, *it));
+            if (it != &da_top(&li.list))
+                Strb_cat_char(out, ' ');
         }
-        Strb_cat_nchar(out, indent, ' ');
         Strb_cat(out, ")");
-    } break;
-    case tag_string: {
-        Strb_catf(out, "\""STRV_FMT"\"", STRV_UNPACK(li.str));
     } break;
     case tag_number: {
         if (fmod(li.number, 1.0) == 0.0)
@@ -404,23 +429,10 @@ bool _dump(Strb *out, const List li, int indent)
         else
             Strb_catf(out, "%f64", li.number);
     } break;
-    case tag_true: {
-        Strb_cat(out, "true");
-    } break;
-    /* case tag_function: {
-        Strb_catf(out, "(fun{%d}\n", li.list.size);
-        da_for (const List, it, &li.list)
-        {
-            TRY(_dump(out, *it, indent + 2));
-            Strb_cat(out, "\n");
-            // if (it != &da_top(&li.list))
-            //     Strb_cat_char(out, ' ');
-        }
-        Strb_cat_nchar(out, indent, ' ');
-        Strb_cat(out, ")");
-
-    } break; */
-    default: Strb_cat(out, "UNKOWN"); break;
+    case tag_symbole:   Strb_catf(out, STRV_FMT, STRV_UNPACK(li.str));  break;
+    case tag_string:    Strb_catf(out, STRV_FMT, STRV_UNPACK(li.str));  break;
+    case tag_true:      Strb_cat(out, "true");                          break;
+    default:            Strb_cat(out, "UNKOWN");                        break;
     }
     return true;
 }
@@ -885,7 +897,26 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             return true;
         }
-        
+        if (Strv_equal_lit(op.str, "format"))
+        { // catstr
+            TRY(li.list.size >= 2);
+
+            Strb acc = {0};
+
+            for (int i = 1; i < li.list.size; i++)
+            {
+                List tmp = {0};
+                TRY(eval(ctx, li.list.arr[i], &tmp));
+                TRY(dump(&acc, tmp));
+            }
+            Strb_fit(&acc);
+            *out = (List){
+                .tag = tag_string,
+                .str = acc.view
+            };
+            return true;
+        }
+
         { // variable or function
             Variable *var_fun;
             Variable key = { .name = op.str };
@@ -944,15 +975,16 @@ bool List_equal(const List li1, const List li2)
 }
 
 
-List List_copy(const List li)
+List List_copy(Ar *arena, const List li)
 {
     if (li.tag == tag_list)
     {
         List res = li;
-        res.list.arr = malloc(sizeof(List) * res.list.size); 
+        res.list.arr = Ar_alloc(arena, sizeof(List) * res.list.size);
+        // res.list.arr = malloc(sizeof(List) * res.list.size); 
 
         for (size_t i = 0; i < li.list.size; i++)
-            res.list.arr[i] = List_copy(li.list.arr[i]);
+            res.list.arr[i] = List_copy(arena, li.list.arr[i]);
         return res;
     }
 
@@ -961,12 +993,12 @@ List List_copy(const List li)
 
 void List_free(List *li)
 {
-    if (li && li->tag == tag_list)
+    /* if (li && li->tag == tag_list)
     {
         da_for (List, it, &li->list)
             List_free(it);
         free(li->list.arr);
-    }
+    } */
 }
 
 
