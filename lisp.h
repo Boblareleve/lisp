@@ -70,6 +70,7 @@ typedef struct Lisp_context
     da_da_Variable args_stack;
     bool in_return; // indicate that the error is only a return mechanism
 
+    Ar arena;
     // Strb error;
 } Lisp_context;
 

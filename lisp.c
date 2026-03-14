@@ -329,8 +329,6 @@ bool list(Ar *arena, Strv *str, List *li)
     return true;
 }
 
-
-
 bool _dump_indent(Strb *out, const List li, int indent)
 {
     TRY(out, error_log("no output Strb"));
@@ -494,9 +492,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
 
     TRY(args_def.list.size == li.list.size - 1, error_log("expected %d arguments got %d", args_def.list.size, li.list.size-1));
     
-    // push args with their names in stack
-    // da_push_zero(&ctx->args_stack);
-    {
+    { // push args with their names in stack
         da_Variable new_frame = {0};
         for (int i = 0; i < args_def.list.size; i++)
         {
@@ -526,7 +522,6 @@ fail:
     if (da_top(&ctx->args_stack).size > 1) // first stack frame should never be pop
     {
         da_free(&da_top(&ctx->args_stack));
-        // da_top(&ctx->args_stack).size--;
         ctx->args_stack.size--;
     }
     return res;
@@ -649,6 +644,15 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             // set or replace variable var.name
             *set_Variable_insert(&ctx->variables, var) = var;
             
+            return true;
+        }
+        if (Strv_equal_lit(op.str, "copy"))
+        {
+            TRY(li.list.size == 2, error_log("expected only 1 argument to be copyed got %d", li.list.size));
+            
+            List to_copy = {0};
+            TRY(eval(ctx, li.list.arr[1], &to_copy));
+            *out = List_copy(&ctx->arena, to_copy);
             return true;
         }
         if (Strv_equal_lit(op.str, "defun"))
