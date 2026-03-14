@@ -509,7 +509,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     *out = NIL_LIST;
 
     // dec ref count
-    if (li.quote_count)
+    if (li.quote_count > 0)
     {
         *out = li;
         out->quote_count--;
@@ -644,9 +644,9 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 TRY(eval(ctx, li.list.arr[1], &cond));
                 
                 if (IS_NIL(cond))
-                break;
+                    break;
                 for (int i = 2; i < li.list.size; i++)
-                TRY(eval(ctx, li.list.arr[i], out));
+                    TRY(eval(ctx, li.list.arr[i], out));
             }
             return true;
         }
@@ -790,15 +790,12 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '&&' got %d", li.list.size));
             
-            List acc = {0};
-            TRY(eval(ctx, li.list.arr[1], &acc));
-            
-            for (int i = 2; i < li.list.size; i++)
+            for (int i = 1; i < li.list.size; i++)
             {
                 List operand = {0};
                 TRY(eval(ctx, li.list.arr[i], &operand));
                 
-                if (acc.tag != tag_true || operand.tag != tag_true)
+                if (IS_NIL(operand))
                     return true; // out is already set to nil (false)
             }
             *out = TRUE_LIST;
@@ -808,15 +805,12 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '||' got %d", li.list.size));
             
-            List acc = {0};
-            TRY(eval(ctx, li.list.arr[1], &acc));
-            
             for (int i = 2; i < li.list.size; i++)
             {
                 List operand = {0};
                 TRY(eval(ctx, li.list.arr[i], &operand));
                 
-                if (acc.tag == tag_true && operand.tag == tag_true)
+                if (!IS_NIL(operand))
                 {
                     *out = TRUE_LIST;
                     return true;
@@ -849,8 +843,6 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             return true;
         }
         
-
-
         { // variable or function
             Variable *var_fun;
             Variable key = { .name = op.str };
