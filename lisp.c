@@ -821,25 +821,30 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         if (Strv_equal_lit(op.str, "first"))
         {
             TRY(li.list.size == 2);
-            TRY(li.list.arr[1].tag == tag_list);
+            TRY(eval(ctx, li.list.arr[1], out), *out = NIL_LIST);
+            TRY(out->tag == tag_list,           *out = NIL_LIST);
+            TRY(out->list.size >= 1,            *out = NIL_LIST; error_log("can't take first element of an empty list"));
 
-            *out = li.list.arr[1];
+            *out = out->list.arr[0];
             return true;
         }
         if (Strv_equal_lit(op.str, "next"))
         {
             TRY(li.list.size == 2);
-            List to_get_next = li.list.arr[1];
-            TRY(to_get_next.tag == tag_list);
-
-            if (to_get_next.list.size > 1)
+            TRY(eval(ctx, li.list.arr[1], out));
+            // List to_get_next = li.list.arr[1];
+            TRY(out->tag == tag_list, *out = NIL_LIST);
+            
+            if (out->list.size > 1)
                 *out = (List){
                     .tag = tag_list,
                     .list = {
-                        .arr = &to_get_next.list.arr[1],
-                        .size = to_get_next.list.size-1
+                        .arr = &out->list.arr[1],
+                        .size = out->list.size-1
                     }
                 };
+            else
+                *out = NIL_LIST;
             return true;
         }
         

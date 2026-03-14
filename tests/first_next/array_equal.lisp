@@ -12,8 +12,8 @@ t
 ))
 
 ;; (&&
-    (array_equal '(1 2)   '(1 2))
-    ;; (!(array_equal '()      '(1)))
-    ;;   (array_equal '()      '())
+    ;; (array_equal '(1 2)   '(1 2))
+    ;; (array_equal '()      '())
+    (!(array_equal '()      '(1)))
     ;; (!(array_equal '(1 2 3) '(1 2)))
 ;; )
