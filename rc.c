@@ -118,13 +118,16 @@ static inline void *Rc_container_make(size_t element_count, size_t element_size)
     return new->arr;
 }
 
-static inline bool List_str_equal(const List li, const char *str, size_t size)
+#define List_to_Strv(li) Strv_make(li.str, li.size)
+
+static inline bool _List_str_equal(const List li, const char *str, size_t size)
 {
     assert(li.tag == tag_string);
     return li.size == size
         && memcmp(li.str, str, size)
     ;
 }
+#define List_str_equal(li, str) _List_str_equal(li, str, STRING_LEN(str))
 
 
 /* static inline void *Rc_container_copy(Rc_container *src, size_t element_size)
