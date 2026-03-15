@@ -4,6 +4,8 @@
 #define AR_IMPLEMENTATION
 #include "lisp.h"
 
+#include "rc.c"
+
 
 Strb error = {0};
 
@@ -25,14 +27,11 @@ SET_IMPLEMENT_HASH_SET(Variable, VAR_IS_NULL, VAR_SET_NULL, 4, 0.8, 4);
 const char *tag_to_string(int tag)
 {
     static const char *table[] = {
-        // [tag_nil]       = "tag_nil",
         [tag_true]      = "tag_true",
         [tag_symbole]   = "tag_symbole",
         [tag_string]    = "tag_string",
         [tag_number]    = "tag_number",
-        // [tag_reference] = "tag_reference",
         [tag_list]      = "tag_list",
-        // [tag_function]  = "tag_function"
     };
     return table[tag];
 }
@@ -195,6 +194,7 @@ void test_list_count(void)
 
 Strv escaping(Ar *arena, Strv str)
 {
+    Ar_save_point sp = Ar_save(arena);
     Strv res = Strv_make(Ar_alloc_align(arena, str.size * 2, sizeof(char)), 0);
 
     for (int i = 0; i < str.size; i++)
@@ -219,11 +219,14 @@ Strv escaping(Ar *arena, Strv str)
         }
         res.arr[res.size++] = str.arr[i];
     }
-
-    res.arr = Ar_realloc(arena, res.arr, str.size * 2, res.size);
+    res.arr = memcpy(malloc(res.size), res.arr, res.size);
+    Ar_restore(arena, sp);
+    // res.arr = Ar_realloc(arena, res.arr, str.size * 2, res.size);
     assert(res.arr);
     return res;
 }
+
+
 
 bool list(Ar *arena, Strv *str, List *li)
 {
@@ -237,6 +240,7 @@ bool list(Ar *arena, Strv *str, List *li)
     if (Strv_first(*str) == '(')
     {
         li->tag = tag_list;
+        li->ref_count = 1;
         ssize_t count = list_count(*str);
         TRY(count != -1, error_log("count error"));
         
@@ -253,7 +257,8 @@ bool list(Ar *arena, Strv *str, List *li)
 
         const Strv save = *str;
         
-        li->list.arr = Ar_alloc(arena, count * sizeof(List));
+        // li->list.arr = Ar_alloc(arena, count * sizeof(List));
+        li->list.arr = malloc(count * sizeof(List));
         li->list.size = 0;
         do {
             li->list.arr[li->list.size] = NIL_LIST;
@@ -267,7 +272,7 @@ bool list(Ar *arena, Strv *str, List *li)
         return true;
     }
     if (isdigit(Strv_first(*str)) || (is_unary_sign(Strv_first(*str)) && isdigit(Strv_char_at(*str, 1))))
-    { // numbers
+    { // numbers : no ref count needed ?
         char *it = str->arr;
         char *end = &str->arr[str->size];
 
@@ -298,7 +303,8 @@ bool list(Ar *arena, Strv *str, List *li)
 
         *li = (List){
             .tag = tag_string,
-            .str = escaping(arena, Strv_range(begin, str->arr))
+            .str = escaping(arena, Strv_range(begin, str->arr)),
+            .ref_count = 1
         };
         Strv_inc(str);
         return true;
@@ -319,7 +325,7 @@ bool list(Ar *arena, Strv *str, List *li)
     // any symbole (yes can be any character)
     *li = (List){
         .tag = tag_symbole,
-        .str = Strv_fun_substr(str, not_is_end)
+        .str = Strv_fun_substr(str, not_is_end) // maybe put that in arena
     };
 
     // special case true
@@ -527,7 +533,30 @@ fail:
     return res;
 }
 
-
+bool set_reset_Variable(Lisp_context *ctx, Variable var)
+{
+    // first look in the stack frame
+    if (ctx->args_stack.size > 0)
+        da_for (Variable, it, &da_top(&ctx->args_stack))
+            if (Strv_equal(it->name, var.name))
+            {
+                // Rc_dec(it->name.arr); // symbole -> static lifetime
+                Rc_dec_List(it->value);
+                break;
+                // it->value = var.value; // I'm I stupid ?
+                // Rc_inc_List(it->value);
+                // return true;
+            }
+    
+    // set or replace variable var.name
+    Variable *old = set_Variable_emplace(&ctx->variables, var);
+    if (!VAR_IS_NULL(*old))
+        Rc_dec_List(old->value);
+    Rc_inc_List(var.value);
+    *old = var;
+    
+    return true;
+}
 
 bool eval(Lisp_context *ctx, const List li, List *out)
 {
@@ -545,7 +574,10 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     switch (li.tag)
     {
     // self-evaluating
-    case tag_string:
+    case tag_string: {
+        // REFMAYBE
+        *out = li;
+    } return true;
     case tag_true:
     case tag_number: {
         *out = li;
@@ -576,13 +608,13 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     case tag_list: {
 
         // nil|false
-        if (li.list.size == 0)
+        if (IS_NIL(li))
         {
             *out = li;
             return true;
         }
 
-        const List op = li.list.arr[0]; 
+        const List op = *li.list; 
         // TRY(op.tag == tag_symbole, error_log("evaluating a list that doesn't start with a symbole"));
         if (op.tag != tag_symbole)
         { // can be an inline function
@@ -592,100 +624,93 @@ bool eval(Lisp_context *ctx, const List li, List *out)
 
         // TODO transform into an prefect hash table
         // uint16_t a = *(uint16_t)&op.str.arr;
+        
+        Rc_List_array *rc = Rc_get(li.list);
 
-        if (Strv_equal_lit(op.str, "?"))
+        if (Rcs_equal_lit(op.str, "?"))
         {
-            TRY(li.list.size == 4, error_log("expected 4 element for '?' got %d", li.list.size));
+            TRY(rc->size == 4, error_log("expected 4 element for '?' got %d", rc->size));
             List cond = {0};
-            TRY(eval(ctx, li.list.arr[1], &cond));
-            return eval(ctx, li.list.arr[(!IS_NIL(cond)) ? 2 : 3], out);
+            TRY(eval(ctx, rc->arr[1], &cond));
+            return eval(ctx, rc->arr[(!IS_NIL(cond)) ? 2 : 3], out);
         }
-        if (Strv_equal_lit(op.str, "if"))
+        if (Rcs_equal_lit(op.str, "if"))
         {
-            TRY(li.list.size == 3, error_log("expected 3 element for 'if' got %d", li.list.size));
+            TRY(rc->size == 3, error_log("expected 3 element for 'if' got %d", rc->size));
             List cond = {0};
-            TRY(eval(ctx, li.list.arr[1], &cond));
+            TRY(eval(ctx, rc->arr[1], &cond));
             if (!IS_NIL(cond))
-                return eval(ctx, li.list.arr[2], out);
+                return eval(ctx, rc->arr[2], out);
             return true;
         }
-        if (Strv_equal_lit(op.str, "print"))
+        if (Rcs_equal_lit(op.str, "print"))
         {
-            TRY(li.list.size >= 2, error_log("expected at least 2 elements for 'print' got %d", li.list.size));
+            TRY(rc->size >= 2, error_log("expected at least 2 elements for 'print' got %d", rc->size));
 
-            for (int i = 1; i < li.list.size; i++)
+            for (int i = 1; i < rc->size; i++)
             {
                 List li_to_print = {0};
-                TRY(eval(ctx, li.list.arr[i], &li_to_print), error_log("failed to eval to print"));
+                TRY(eval(ctx, rc->arr[i], &li_to_print), error_log("failed to eval to print"));
                 TRY(List_print(li_to_print), error_log("failed to print"));
-                // printf("\t");
             }
             return true;
         }
-        if (Strv_equal_lit(op.str, "set"))
+        if (Rcs_equal_lit(op.str, "set"))
         { // lazy evaluate
-            TRY(li.list.size == 3, error_log("expected 3 element list for set got %d", li.list.size));
-            TRY(li.list.arr[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(li.list.arr[1].tag)));
+            TRY(rc->size == 3, error_log("expected 3 element list for set got %d", rc->size));
+            TRY(rc->arr[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(rc->arr[1].tag)));
 
-            Variable var = {
-                .name = li.list.arr[1].str,
-            };
-            TRY(eval(ctx, li.list.arr[2], &var.value));
+            Variable var = { .name = rc->arr[1].str };
+            TRY(eval(ctx, rc->arr[2], &var.value));
+            
+            TRY(set_reset_Variable(ctx, var));
 
-            // first look in the stack frame
-            if (ctx->args_stack.size > 0)
-                da_for (Variable, it, &da_top(&ctx->args_stack))
-                    if (Strv_equal(it->name, var.name))
-                    {
-                        it->value = var.value;
-                        return true;
-                    }
-            
-            // set or replace variable var.name
-            *set_Variable_insert(&ctx->variables, var) = var;
-            
             return true;
         }
-        if (Strv_equal_lit(op.str, "copy"))
+        if (Rcs_equal_lit(op.str, "copy"))
         {
-            TRY(li.list.size == 2, error_log("expected only 1 argument to be copyed got %d", li.list.size));
-            
+            TRY(rc->size == 2, error_log("expected only 1 argument to be copyed got %d", rc->size));
+
             List to_copy = {0};
-            TRY(eval(ctx, li.list.arr[1], &to_copy));
+            TRY(eval(ctx, rc->arr[1], &to_copy));
             *out = List_copy(&ctx->arena, to_copy);
             return true;
         }
-        if (Strv_equal_lit(op.str, "defun"))
+        if (Rcs_equal_lit(op.str, "defun"))
         {
-            TRY(li.list.size == 3, error_log("expected 3 element list for defun got %d", li.list.size));
-            TRY(li.list.arr[1].tag == tag_symbole, error_log("expected a symbole to defun to got %s", tag_to_string(li.list.arr[1].tag)));
+            TRY(rc->size == 3, error_log("expected 3 element list for defun got %d", rc->size));
+            TRY(rc->arr[1].tag == tag_symbole, error_log("expected a symbole to defun to got %s", tag_to_string(rc->arr[1].tag)));
 
             Variable var = {
-                .name = li.list.arr[1].str,
-                .value = li.list.arr[2]
+                .name = rc->arr[1].str,
+                .value = rc->arr[2]
             };
 
             // set or replace function var.name
-            *set_Variable_insert(&ctx->functions, var) = var;
+            Variable *old = set_Variable_emplace(&ctx->functions, var);
+            if (!VAR_IS_NULL(*old))
+                Rc_dec_List(old->value);
             
+            Rc_inc_List(var.value);
+            *old = var;    
             return true;
         }
-        if (Strv_equal_lit(op.str, "while"))
+        if (Rcs_equal_lit(op.str, "while"))
         { // return last value of the body and of the last iteration or () if no body
-            TRY(li.list.size >= 2); // the condition can have side effects
+            TRY(rc->size >= 2); // the condition can have side effects
             for (;;)
             {
                 List cond = {0};
-                TRY(eval(ctx, li.list.arr[1], &cond));
+                TRY(eval(ctx, rc->arr[1], &cond));
                 
                 if (IS_NIL(cond))
                     break;
-                for (int i = 2; i < li.list.size; i++)
-                    TRY(eval(ctx, li.list.arr[i], out));
+                for (int i = 2; i < rc->size; i++)
+                    TRY(eval(ctx, rc->arr[i], out));
             }
             return true;
         }
-        if (Strv_equal_lit(op.str, "return"))
+        if (Rcs_equal_lit(op.str, "return"))
         {
             TRY(li.list.size == 1 || li.list.size == 2);
             if (li.list.size == 2)
@@ -694,7 +719,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             ctx->in_return = true;
             return false;
         }
-        if (Strv_equal_lit(op.str, "+"))
+        if (Rcs_equal_lit(op.str, "+"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '+' got %d", li.list.size));
             List res = {
@@ -713,7 +738,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = res;
             return true;
         }
-        if (Strv_equal_lit(op.str, "-"))
+        if (Rcs_equal_lit(op.str, "-"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '-' got %d", li.list.size));
             List res = {0};
@@ -732,7 +757,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = res;
             return true;
         }
-        if (Strv_equal_lit(op.str, "*"))
+        if (Rcs_equal_lit(op.str, "*"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 2 elements for '*' got %d", li.list.size));
             List res = { 
@@ -751,7 +776,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = res;
             return true;
         }
-        if (Strv_equal_lit(op.str, "/"))
+        if (Rcs_equal_lit(op.str, "/"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 2 elements for '/' got %d", li.list.size));
             List res = {0};
@@ -770,7 +795,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = res;
             return true;
         }
-        if (Strv_equal_lit(op.str, "//"))
+        if (Rcs_equal_lit(op.str, "//"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 2 elements for '//' got %d", li.list.size));
             List res = {0};
@@ -790,7 +815,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = res;
             return true;
         }
-        if (Strv_equal_lit(op.str, "=="))
+        if (Rcs_equal_lit(op.str, "=="))
         {
             TRY(li.list.size >= 3, error_log("expected at least 2 elements for '==' got %d", li.list.size));
             
@@ -809,7 +834,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
-        if (Strv_equal_lit(op.str, "!="))
+        if (Rcs_equal_lit(op.str, "!="))
         {
             TRY(li.list.size >= 3, error_log("expected at least 2 elements for '!=' got %d", li.list.size));
             
@@ -827,7 +852,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
-        if (Strv_equal_lit(op.str, "!"))
+        if (Rcs_equal_lit(op.str, "!"))
         {
             TRY(li.list.size >= 2, error_log("expected at least 2 elements for '==' got %d", li.list.size));
             
@@ -843,7 +868,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             //     return false;
             return true;
         }
-        if (Strv_equal_lit(op.str, "&&"))
+        if (Rcs_equal_lit(op.str, "&&"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '&&' got %d", li.list.size));
             
@@ -858,7 +883,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
-        if (Strv_equal_lit(op.str, "||"))
+        if (Rcs_equal_lit(op.str, "||"))
         {
             TRY(li.list.size >= 3, error_log("expected at least 3 elements for '||' got %d", li.list.size));
             
@@ -875,7 +900,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             }
             return true; // out is already set to nil (false)
         }
-        if (Strv_equal_lit(op.str, "first"))
+        if (Rcs_equal_lit(op.str, "first"))
         {
             TRY(li.list.size == 2);
             TRY(eval(ctx, li.list.arr[1], out), *out = NIL_LIST);
@@ -885,7 +910,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = out->list.arr[0];
             return true;
         }
-        if (Strv_equal_lit(op.str, "next"))
+        if (Rcs_equal_lit(op.str, "next"))
         {
             TRY(li.list.size == 2);
             TRY(eval(ctx, li.list.arr[1], out));
@@ -904,7 +929,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 *out = NIL_LIST;
             return true;
         }
-        if (Strv_equal_lit(op.str, "for"))
+        if (Rcs_equal_lit(op.str, "for"))
         {
             TRY(li.list.size >= 4);
             TRY(li.list.arr[1].tag == tag_symbole);
@@ -927,7 +952,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             return true;
         }
-        if (Strv_equal_lit(op.str, "format"))
+        if (Rcs_equal_lit(op.str, "format"))
         { // catstr
             TRY(li.list.size >= 2);
 
@@ -982,7 +1007,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
 
 bool List_equal(const List li1, const List li2)
 {
-    if (li1.tag != li2.tag)
+    if (li1.tag != li2.tag || li1.quote_count != li2.quote_count)
         return false;
     
     switch (li1.tag)
@@ -994,8 +1019,6 @@ bool List_equal(const List li1, const List li2)
             TRY(List_equal(li1.list.arr[i], li2.list.arr[i]));
         return true;
     } break;
-    // case tag_function:  TODO("fun equal"); break;
-    // case tag_reference: TODO("ref equal"); break;
     case tag_string:    return Strv_equal(li1.str, li2.str);
     case tag_symbole:   return Strv_equal(li1.str, li2.str);
     case tag_true:      return li2.tag == tag_true;
@@ -1005,30 +1028,59 @@ bool List_equal(const List li1, const List li2)
 }
 
 
+
+
 List List_copy(Ar *arena, const List li)
 {
     if (li.tag == tag_list)
     {
+        if (IS_NIL(li))
+            return li;
+        
         List res = li;
-        res.list.arr = Ar_alloc(arena, sizeof(List) * res.list.size);
-        // res.list.arr = malloc(sizeof(List) * res.list.size); 
+        // res.list.arr = Ar_alloc(arena, sizeof(List) * res.list.size);
+        // res.list = malloc(sizeof(Rc_List_array) + sizeof(List) * ); 
+        res.list = Rc_container_copy(li.list, sizeof(List));
 
-        for (size_t i = 0; i < li.list.size; i++)
-            res.list.arr[i] = List_copy(arena, li.list.arr[i]);
+        for (size_t i = 0; i < Rc_get(li.list)->size; i++)
+            res.list[i] = List_copy(arena, li.list[i]);
         return res;
     }
+    if (li.tag == tag_string)
+    {
+        List res = li;
+        res.str = Rc_container_copy(Rc_get(li.str), sizeof(char));
+        return res;
+    }
+    // tag_symbole have a static lifetime for now. To see for meta programming 
 
     return li;
 }
 
+
+// dec Rc
 void List_free(List *li)
 {
-    /* if (li && li->tag == tag_list)
+    if (!li) return ;
+    
+    if (li->tag == tag_list)
     {
-        da_for (List, it, &li->list)
-            List_free(it);
-        free(li->list.arr);
-    } */
+        if (IS_NIL(*li)) return ;
+
+        Rc_List_array *rc_li = (Rc_List_array*)Rc_get(li->list);
+        for (size_t i = 0; i < rc_li->size; i++)
+            List_free(&rc_li->arr[i]);
+        Rc_dec(rc_li);
+
+        return ;
+    }
+    if (li->tag == tag_string)
+    {
+        Rc_dec(Rc_get(li->str));
+        return ;
+    }
+    
+    // tag_symbole have a static lifetime for now. To see for meta programming 
 }
 
 
@@ -1040,14 +1092,23 @@ Lisp_context Lisp_context_init(void)
     return res;
 }
 
+
 void Lisp_context_free(Lisp_context *ctx)
 {
-    // da_for (da_Variable, it, &ctx->args_stack)
-    //     da_free(it);
     da_free(&ctx->args_stack);
-    // da_free(&ctx->for_stack);
     
+    set_for (Variable, it, &ctx->variables)
+    {
+        Strv_Rc_dec(it->name);
+        List_free(it);
+    }
     set_Variable_free(&ctx->variables);
+    
+    set_for (Variable, it, &ctx->functions)
+    {
+        Strv_Rc_dec(it->name);
+        List_free(it);
+    }
     set_Variable_free(&ctx->functions);
 }
 

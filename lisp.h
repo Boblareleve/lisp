@@ -12,41 +12,62 @@
 #include "ar_virt.h"
 
 
-enum List_tag {
+typedef enum List_tag {
     tag_list = 0,  // (a a a)|()
     tag_true,      // t
     tag_symbole,   // 
     tag_string,    // "dslmjkfdsqml"
     tag_number,    // 4326324 3.3
-};
-typedef uint8_t List_tag;
+} List_tag;
+// typedef uint16_t List_tag;
 
 
 #define NIL_LIST (List){0}
 #define TRUE_LIST (List){ .tag = tag_true }
-#define IS_NIL(li) ((li).tag == tag_list && (li).list.size == 0)
+#define IS_NIL(li) ((li).tag == tag_list && (li).list == NULL)
+
+
+
+// while >= 0 object valid -> rc == 0 <=> one reference for (Rc_container){0} convinence
+#define RC_CONTAINER_HEADER struct { size_t ref_count; size_t size; }
+
+typedef struct Rc_container
+{
+    RC_CONTAINER_HEADER;
+    uint8_t *arr[0];
+} Rc_container;
+
+typedef struct Rc_List_array
+{
+    RC_CONTAINER_HEADER;
+    List arr[0];
+} Rc_List_array;
+typedef struct Rc_String
+{
+    RC_CONTAINER_HEADER;
+    char arr[0];
+} Rc_String;
+
+
+
+
+
+// maybe get down to 8 bytes using uint32_t for indexing into a pool
 typedef struct List
 {
     List_tag tag;
-    uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
-    uint16_t ref_count;   // smart pointer
-/* #ifdef LISP_DEBUG_INFO
-    struct {
-        uint16_t lign;
-        uint16_t character;
-    } debug_info;
-#endif */
+    uint32_t quote_count; // how many reference "(QUOTE self)" depth it is
     union {
-        struct {
-            struct List *arr;
-            size_t size;
-        } list;
-        Strv str;
+        List *list;
+        char *str;
         // int64_t number; // double ?
         double number;
     };
 } List;
-static_assert(sizeof(List) == 24);
+
+static_assert(sizeof(Rc_container) == 16);
+static_assert(sizeof(List) == 16);
+static_assert(sizeof(List) == sizeof(Rc_container));
 
 
 typedef struct Variable
