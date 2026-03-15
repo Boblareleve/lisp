@@ -9,46 +9,31 @@
 #include "sets.h"
 #include <stdlib.h>
 #include <setjmp.h>
+
+#define AR_MAX_ALIGN 8
 #include "ar_virt.h"
 
-
-typedef enum List_tag {
+typedef enum __attribute__((packed)) List_tag
+{
     tag_list = 0,  // (a a a)|()
     tag_true,      // t
     tag_symbole,   // 
     tag_string,    // "dslmjkfdsqml"
     tag_number,    // 4326324 3.3
-} List_tag;
-// typedef uint16_t List_tag;
+    // tag_slice,     
+    // tag_integer
+    // tag_...
+} __attribute__((packed)) List_tag;
+static_assert(sizeof(List_tag) == 1);
 
 
 #define NIL_LIST (List){0}
 #define TRUE_LIST (List){ .tag = tag_true }
-#define IS_NIL(li) ((li).tag == tag_list && (li).list == NULL)
+#define IS_NIL(li) ((li).tag == tag_list && (li).size == 0)
 
 
 
-// while >= 0 object valid -> rc == 0 <=> one reference for (Rc_container){0} convinence
-#define RC_CONTAINER_HEADER struct { size_t ref_count; size_t size; }
-
-typedef struct Rc_container
-{
-    RC_CONTAINER_HEADER;
-    uint8_t *arr[0];
-} Rc_container;
-
-typedef struct Rc_List_array
-{
-    RC_CONTAINER_HEADER;
-    List arr[0];
-} Rc_List_array;
-typedef struct Rc_String
-{
-    RC_CONTAINER_HEADER;
-    char arr[0];
-} Rc_String;
-
-
+#include "rc.c"
 
 
 
@@ -56,7 +41,15 @@ typedef struct Rc_String
 typedef struct List
 {
     List_tag tag;
-    uint32_t quote_count; // how many reference "(QUOTE self)" depth it is
+    uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
+    
+    union {
+        struct {
+            uint16_t offset; // only to get back the Rc_container
+            uint16_t size;   
+        };
+    };
+    
     union {
         List *list;
         char *str;
@@ -65,9 +58,9 @@ typedef struct List
     };
 } List;
 
-static_assert(sizeof(Rc_container) == 16);
-static_assert(sizeof(List) == 16);
-static_assert(sizeof(List) == sizeof(Rc_container));
+static_assert(sizeof(Rc_container) == 8);
+static_assert(sizeof(List)         == 16);
+// static_assert(sizeof(List) == sizeof(Rc_container));
 
 
 typedef struct Variable
