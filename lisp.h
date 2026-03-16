@@ -33,22 +33,20 @@ static_assert(sizeof(List_tag) == 1);
 
 
 
-#include "rc.c"
-
-
+typedef struct List List;
 
 // maybe get down to 8 bytes using uint32_t for indexing into a pool
-typedef struct List
+struct List
 {
     List_tag tag;
     uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
     
-    union {
-        struct {
+    // union {
+    //     struct {
             uint16_t offset; // only to get back the Rc_container
             uint16_t size;   
-        };
-    };
+    //     };
+    // };
     
     union {
         List *list;
@@ -56,11 +54,9 @@ typedef struct List
         // int64_t number; // double ?
         double number;
     };
-} List;
+};
+static_assert(sizeof(List) == 16);
 
-static_assert(sizeof(Rc_container) == 8);
-static_assert(sizeof(List)         == 16);
-// static_assert(sizeof(List) == sizeof(Rc_container));
 
 
 typedef struct Variable
@@ -87,6 +83,8 @@ typedef struct Lisp_context
     Ar arena;
     // Strb error;
 } Lisp_context;
+
+#include "rc.h"
 
 
 extern Strb error;

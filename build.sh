@@ -1,6 +1,6 @@
 
 
-WFLAGS='-Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wno-address'
+WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wno-address'
 
 OUT=
 
@@ -30,11 +30,14 @@ case $2 in
     test_basic)
         ./$OUT tests/basic/*.lisp
     ;;
+    test_functions)
+        ./$OUT tests/functions/*.lisp
+    ;;
     '')
         exit 0
     ;;
     *)
-        echo UNKOWN test \'$2\' usage: $0 '{release,debug,sanitized}' '?{test_all, test_basic}'
+        echo UNKOWN test \'$2\' usage: $0 '{release,debug,sanitized}' '?{test_all, test_basic test_functions}'
         exit 1
     ;;
 esac

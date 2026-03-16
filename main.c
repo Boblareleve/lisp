@@ -5,7 +5,7 @@ bool test_eval(const da_List lis)
 {
     Lisp_context ctx = Lisp_context_init();
     if (da_first(&lis).tag == tag_symbole 
-     && Strv_equal_lit(da_first(&lis).str, "ERROR")
+     && List_str_equal(da_first(&lis), "ERROR")
     ) { // expect error
         for (int i = 1; i < lis.size; i++)
         {
@@ -93,7 +93,7 @@ bool test(const Strv str)
     if (do_copy)
     {
         bool some_changes = false;
-        for (size_t i = 0; i < cpy.size; i++)
+        for (int i = 0; i < cpy.size; i++)
             if (!List_equal(cpy.arr[i], lis.arr[i])) 
             {
                 printf("code have change\t");

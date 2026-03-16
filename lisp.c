@@ -4,8 +4,6 @@
 #define AR_IMPLEMENTATION
 #include "lisp.h"
 
-#include "rc.c"
-
 
 Strb error = {0};
 
@@ -330,7 +328,7 @@ bool list(Ar *arena, Strv *str, List *li)
     };
 
     // special case true
-    if (List_str_equal(*li, "t"))
+    if (Strv_equal_lit(symbole, "t"))
         *li = (List){ .tag = tag_true };
     
     return true;
@@ -451,7 +449,7 @@ bool List_print(const List li)
     static Strb to_print = {0};
     to_print.size = 0;
 
-    TRY(dump_indent(&to_print, li));
+    TRY(dump/* _indent */(&to_print, li));
     printf(STRV_FMT, STRV_UNPACK(to_print.view));
     return true;
 }
@@ -507,7 +505,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
         for (int i = 0; i < args_def.size; i++)
         {
             // TODO set_stack_Variable ?
-            da_push(&new_frame, (Variable){ .name = args_def.list[i].str });
+            da_push(&new_frame, (Variable){ .name = List_to_Strv(args_def.list[i]) });
             GOTRY(eval(ctx, li.list[i+1], &da_top(&new_frame).value));
             Rc_inc_List(da_top(&new_frame).value);
         }
@@ -525,7 +523,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
         }
     
     // return the last one
-    GOTRY(eval(ctx, func_def.list[0], out));
+    GOTRY(eval(ctx, func_def.list[func_def.size-1], out));
 
 end:
     res = true;
@@ -674,7 +672,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 3, error_log("expected 3 element list for set got %d", li.size));
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(li.list[1].tag)));
 
-            Variable var = { .name = li.list[1].str };
+            Variable var = { .name = List_to_Strv(li.list[1]) };
             TRY(eval(ctx, li.list[2], &var.value));
             
             set_reset_Variable(ctx, var);
@@ -696,7 +694,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to defun to got %s", tag_to_string(li.list[1].tag)));
 
             Variable var = {
-                .name = li.list[1].str,
+                .name = List_to_Strv(li.list[1]),
                 .value = li.list[2]
             };
 
@@ -981,7 +979,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(eval(ctx, li.list[2], &iterable));
             TRY(iterable.tag == tag_list);
 
-            Variable *it = set_stack_Variable(ctx, (Variable){ .name = li.list[1].str });
+            Variable *it = set_stack_Variable(ctx, (Variable){ .name = List_to_Strv(li.list[1]) });
             for (int i = 0; i < iterable.size; i++)
             {
                 it->value = iterable.list[i];
@@ -1013,14 +1011,14 @@ bool eval(Lisp_context *ctx, const List li, List *out)
                 .size = acc.size,
                 .str = memcpy(Rc_container_make(acc.size, sizeof(char)), acc.arr, acc.size)
             };
-            Rc_get_str(out->str)->ref_count = -1; // orphan
+            Rc_get_str(*out)->ref_count = -1; // orphan
 
             return true;
         }
 
         { // variable or function
             Variable *var_fun;
-            Variable key = { .name = op.str };
+            Variable key = { .name = List_to_Strv(op) };
             var_fun = get_variable_in_stack(ctx, key);
             if (var_fun)
             { // got a local variable
@@ -1147,14 +1145,14 @@ void Lisp_context_free(Lisp_context *ctx)
     set_for (Variable, it, &ctx->variables)
     {
         // Strv_Rc_dec(it->name); symbole
-        List_free(it);
+        List_free(&it->value);
     }
     set_Variable_free(&ctx->variables);
     
     set_for (Variable, it, &ctx->functions)
     {
         // Strv_Rc_dec(it->name); symbole
-        List_free(it);
+        List_free(&it->value);
     }
     set_Variable_free(&ctx->functions);
 }

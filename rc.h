@@ -20,23 +20,26 @@ typedef struct Rc_String
     char arr[0];
 } Rc_String;
 
+static_assert(sizeof(Rc_container) == 8);
+
+
 #define _Rc_get(obj) (((Rc_container*)(obj))-1)
 // #define Rc_dec(rc) (assert((rc)->ref_count >= 0), rc->ref_count == 0 ? free(rc) : rc->ref_count--)
 // #define Strv_Rc_dec(strv) Rc_dec(Rc_get(strv.arr))
 // #define Rc_String_to_Strv(rc_s) (assert((rc_s)->ref_count >= 0), (rc_s)->ref_count++, Strv_make((rc_s)->arr, (rc_s)->size))
 
 
-Rc_List_array *Rc_get_list(const List *li)
+static inline Rc_List_array *Rc_get_list(const List li)
 {
-    if (li->tag != tag_list) return NULL;
+    if (li.tag != tag_list) return NULL;
 
-    return (Rc_List_array*)_Rc_get(&li->list[-(int)li->offset]);
+    return (Rc_List_array*)_Rc_get(&li.list[-(int)li.offset]);
 }
-Rc_String *Rc_get_str(const List *li)
+static inline Rc_String *Rc_get_str(const List li)
 {
-    if (li->tag != tag_string) return NULL;
+    if (li.tag != tag_string) return NULL;
 
-    return (Rc_String*)_Rc_get(&li->str[-(int)li->offset]);
+    return (Rc_String*)_Rc_get(&li.str[-(int)li.offset]);
 }
 
 
@@ -63,14 +66,14 @@ static inline bool Rc_inc_List(List li)
     {
         if (!li.list) return true;
         
-        Rc_get_list(li.list)->ref_count++;
+        Rc_get_list(li)->ref_count++;
         return true;
     }
     if (li.tag == tag_string)
     {
         if (!li.str) return true;
         
-        Rc_get_str(li.str)->ref_count++;
+        Rc_get_str(li)->ref_count++;
         return true;
     }
     return true;
@@ -80,12 +83,12 @@ static inline bool Rc_dec_List(List li)
     if (li.tag == tag_list)
     {
         if (!li.list) return true;
-
-        Rc_List_array *rc = Rc_get_list(li.list);
+        
+        Rc_List_array *rc = Rc_get_list(li);
         if (rc->ref_count == 0)
         {
             rc->ref_count = -1;
-            free(rc->arr);
+            if (0) free(rc);
         }
         else
             rc->ref_count--;
@@ -95,11 +98,11 @@ static inline bool Rc_dec_List(List li)
     {
         if (!li.list) return true;
 
-        Rc_String *rc = Rc_get_str(li.str);
+        Rc_String *rc = Rc_get_str(li);
         if (rc->ref_count == 0)
         {
             rc->ref_count = -1;
-            free(rc->arr);
+            if (0) free(rc);
         }
         else
             rc->ref_count--;
@@ -122,9 +125,9 @@ static inline void *Rc_container_make(size_t element_count, size_t element_size)
 
 static inline bool _List_str_equal(const List li, const char *str, size_t size)
 {
-    assert(li.tag == tag_string);
+    assert(li.tag == tag_string || li.tag == tag_symbole);
     return li.size == size
-        && memcmp(li.str, str, size)
+        && memcmp(li.str, str, size) == 0
     ;
 }
 #define List_str_equal(li, str) _List_str_equal(li, str, STRING_LEN(str))

@@ -5,6 +5,8 @@ t
     (set a 0)
     (set b 1)
     (set i 0)
+    (print a " " b " " i)
+    
     (while (!= i n)
         (set tmp a)
         (set a (+ b a))
@@ -13,6 +15,7 @@ t
     )
     a
 ))
+
 (&&
     (== (fib 9) 34)
     (== (fib 4) 3)
