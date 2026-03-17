@@ -1,3 +1,2 @@
 ()
-(set a 1)
-(print a)
+(print "ds mk ")

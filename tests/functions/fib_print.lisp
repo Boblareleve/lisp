@@ -2,14 +2,14 @@
 t
 (defun fib ((n)
 
-    (set a 0)
-    (set b 1)
-    (set i 0)
+    (local a 0)
+    (local b 1)
+    (local i 0)
     (while (!= i n)
-        (set tmp a)
-        (set a (+ b a))
-        (set b tmp)
-        (set i (+ i 1))
+        (= tmp a)
+        (= a (+ b a))
+        (= b tmp)
+        (= i (+ i 1))
     )
     a
 ))

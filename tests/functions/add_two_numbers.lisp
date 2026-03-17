@@ -8,12 +8,12 @@
     (local res 0)
     
     (while (&& a b)
-        (local res (* res 10))
-        ;; (set sum (get_sum a b))
+        (= res (* res 10))
+        ;; (local sum (get_sum a b))
         (local sum (+ (first a) (first b)))
-        (local res (+ res sum))
-        (local a (next a))
-        (local b (next b))
+        (= res (+ res sum))
+        (= a (next a))
+        (= b (next b))
     )
 ))
 

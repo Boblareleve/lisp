@@ -137,7 +137,7 @@ int main(int argc, char **argv)
         if (!test(raw.view))
             printf("\tFAILURE\n");
         else
-            printf("SUCCESS\n");
+            printf("\tSUCCESS\n");
         
 
         Strb_free(raw);

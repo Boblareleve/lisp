@@ -1,8 +1,10 @@
-()
-
-(print "(")
+6
+(local sum 0)
+;; (print "(")
 (for it '(1 2 3)
-    (print it)
-    (print " ")
+    (= sum (+ sum it))
+    ;; (print it)
+    ;; (print " ")
 )
-(print ")")
+sum
+;; (print ")")
