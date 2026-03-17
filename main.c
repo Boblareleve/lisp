@@ -16,12 +16,12 @@ bool test_eval(const da_List lis)
                 return true;
             }
         }
-        printf("no error while expecting one\t");
+        fprintf(stderr, "no error while expecting one\t");
         goto fail;
     }
     List expect = {0};
     GOTRY(eval(&ctx, da_first(&lis), &expect), 
-        printf("eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view));
+        fprintf(stderr, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view));
     );
     // last expected to be equal to "expect"
     List tmp = (List){0};
@@ -29,15 +29,15 @@ bool test_eval(const da_List lis)
     {
         tmp = (List){0};
         GOTRY(eval(&ctx, lis.arr[i], &tmp), 
-            printf("unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view));
+            fprintf(stderr, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view));
         );
     }
     GOTRY(List_equal(expect, tmp),
-        printf("unexpected result got: ");
+        fprintf(stderr, "unexpected result got: ");
         List_print(tmp);
-        printf("  expecting: ");
+        fprintf(stderr, "  expecting: ");
         List_print(expect);
-        printf("\t");
+        fprintf(stderr, "\t");
     );
 
     Lisp_context_free(&ctx);
@@ -69,7 +69,7 @@ bool test(const Strv str)
 
         da_push_zero(&lis);
         GOTRY(list(&arena, &it, &da_top(&lis)),
-            printf("parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
+            fprintf(stderr, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
         );
     }
     
@@ -96,10 +96,10 @@ bool test(const Strv str)
         for (int i = 0; i < cpy.size; i++)
             if (!List_equal(cpy.arr[i], lis.arr[i])) 
             {
-                printf("code have change\t");
+                fprintf(stderr, "code have change\t");
                 some_changes = true;
             }
-        if (!some_changes) printf("no code changes\t");
+        if (!some_changes) fprintf(stderr, "no code changes\t");
     }
     
     da_for (List, it, &lis)
@@ -133,11 +133,11 @@ int main(int argc, char **argv)
             continue ;
         }
         
-        printf("TEST %-*s\t", 48, argv[i]);
+        fprintf(stderr, "TEST %-*s\t", 48, argv[i]);
         if (!test(raw.view))
-            printf("\tFAILURE\n");
+            fprintf(stderr, "\tFAILURE\n");
         else
-            printf("\tSUCCESS\n");
+            fprintf(stderr, "\tSUCCESS\n");
         
 
         Strb_free(raw);

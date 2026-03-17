@@ -450,8 +450,8 @@ bool List_print(const List li)
     static Strb to_print = {0};
     to_print.size = 0;
 
-    TRY(dump/* _indent */(&to_print, li));
-    printf(STRV_FMT, STRV_UNPACK(to_print.view));
+    TRY(dump_indent(&to_print, li));
+    fprintf(stdout, STRV_FMT, STRV_UNPACK(to_print.view));
     return true;
 }
 
@@ -700,19 +700,35 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         }
         if (List_str_equal(op, "[]"))
         {
-            TRY(li.size == 3, error_log("expected 3 element list for set got %d", li.size));
-
+            TRY(li.size == 3 || li.size == 4, error_log("expected 3 or 4 element list for [] got %d", li.size));
+            
             List list = {0};
             TRY(eval(ctx, li.list[1], &list));
             TRY(list.tag == tag_list, error_log("expected a list to index %s", tag_to_string(list.tag)));
             
-            List index = {0};
-            TRY(eval(ctx, li.list[2], &index));
-            TRY(index.tag == tag_number, error_log("expected an index %s", tag_to_string(index.tag)));
-            
-            int i_index = index.number;
-            TRY(0 <= i_index && i_index < list.size);
-            *out = list.list[i_index];
+            List index_l = {0};
+            TRY(eval(ctx, li.list[2], &index_l));
+            TRY(index_l.tag == tag_number, error_log("expected an index %s", tag_to_string(index_l.tag)));
+            int i_index_l = index_l.number;
+            TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
+
+            List index_h = {0};
+            if (li.size == 4)
+            {
+                TRY(eval(ctx, li.list[3], &index_h));
+                TRY(index_h.tag == tag_number, error_log("expected an index %s", tag_to_string(index_h.tag)));
+                int i_index_h = index_h.number;
+                TRY(i_index_l < i_index_h && i_index_h <= list.size, error_log("out of bounds %d is not range of list of size %d", i_index_h, list.size));
+                Rc_inc_List(li);
+                *out = list;
+                out->size = i_index_h - i_index_l; // [] '(1 2 3) 1 2 -> .size = 1  
+                out->offset += i_index_l;          //                 -> offset+1
+                out->list   += i_index_l;          //                 -> ptr + 1
+                printf("->> [%d:%d] %d %d\n", i_index_l, i_index_h, out->size, out->offset);
+                return true;
+            }
+
+            *out = list.list[i_index_l];
             return true;
         }
         if (List_str_equal(op, "copy"))
