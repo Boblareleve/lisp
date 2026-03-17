@@ -614,7 +614,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     case tag_symbole: {
 
         Variable *var_fun;
-        Variable key = { .name = li.str };
+        Variable key = { .name = List_to_Strv(li) };
 
         var_fun = get_variable_in_stack(ctx, key);
         if (var_fun)

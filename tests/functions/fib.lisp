@@ -5,7 +5,6 @@ t
     (set a 0)
     (set b 1)
     (set i 0)
-    (print a " " b " " i)
     
     (while (!= i n)
         (set tmp a)
