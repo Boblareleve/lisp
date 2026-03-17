@@ -1,3 +1,2 @@
-t
-
-(print (copy '(a b d 3432)))
+'(a b v 354)
+(copy '(a b v 354))

@@ -5,8 +5,8 @@ t
     (while (&& a b) ;; while a and b are not empty
         (if (!= (first a) (first b)) (return ()))
 
-        (set a (next a))
-        (set b (next b))
+        (local a (next a))
+        (local b (next b))
     )
     (&& (! a) (! b)) ;; a and b empty
 ))

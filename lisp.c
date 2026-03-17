@@ -543,29 +543,29 @@ fail:
 // return true if it remplace or destroy one (or more) local or global variable
 bool set_reset_Variable(Lisp_context *ctx, Variable var)
 {
-    bool remplace = false;
+    // bool remplace = false;
     // first look in the stack frame
     if (ctx->args_stack.size > 0)
         da_for (Variable, it, &da_top(&ctx->args_stack))
-            if (Strv_equal(it->name, var.name))
-            {
-                Rc_dec_List(it->value);
-                remplace = true;
-                break;
-            }
+            TRY(!Strv_equal(it->name, var.name), error_log("try to set a global variable with the same name a local one: '%sv'", &var.name));
+            // {
+                // Rc_dec_List(it->value);
+                // remplace = true;
+                // break;
+            // }
     
     // set or replace variable var.name
     Variable *old = set_Variable_emplace(&ctx->variables, var);
     if (!VAR_IS_NULL(*old))
-    {
         Rc_dec_List(old->value);
-        remplace = true;
-    }
+    // {
+        // remplace = true;
+    // }
 
     Rc_inc_List(var.value);
     *old = var;
     
-    return remplace;
+    return true;
 }
 
 // return true if it remplace a local variable
@@ -619,13 +619,15 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         var_fun = get_variable_in_stack(ctx, key);
         if (var_fun)
         {
-            TRY(eval(ctx, var_fun->value, out));
+            *out = var_fun->value;
+            // TRY(eval(ctx, var_fun->value, out));
             return true;
         }
         var_fun = set_Variable_get(&ctx->variables, key);
         if (var_fun)
         {
-            TRY(eval(ctx, var_fun->value, out));
+            *out = var_fun->value;
+            // TRY(eval(ctx, var_fun->value, out));
             return true;
         }
         TRY(set_Variable_get(&ctx->functions, key), 
@@ -660,7 +662,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 3, error_log("expected 3 element list for local got %d", li.size));
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
 
-            Variable var = { .name = li.list[1].str };
+            Variable var = { .name = List_to_Strv(li.list[1]) };
             TRY(eval(ctx, li.list[2], &var.value));
 
             local_Variable(ctx, var);
@@ -675,7 +677,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             Variable var = { .name = List_to_Strv(li.list[1]) };
             TRY(eval(ctx, li.list[2], &var.value));
             
-            set_reset_Variable(ctx, var);
+            TRY(set_reset_Variable(ctx, var));
 
             return true;
         }
@@ -1040,7 +1042,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             }
         }
         
-        error_log("no primitive '%sv' found to evaluate a list", &op.str);
+        error_log("no primitive '%.*s' found to evaluate a list", op.size, op.str);
     } return false;
 
     default: UNREACHABLE("eval switch"); return false;
@@ -1055,13 +1057,12 @@ bool List_equal(const List li1, const List li2)
     
     switch (li1.tag)
     {
-    case tag_number: return fabs(li1.number - li2.number) < 1.0E-14;
+    case tag_number: return fabs(li1.number - li2.number) < 1.0E-10;
     case tag_list: {
         TRY(li1.size == li2.size);
         for (int i = 0; i < li1.size; i++)
             TRY(List_equal(li1.list[i], li2.list[i]));
-        return true;
-    } break;
+    } return true;
     case tag_string:    return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_symbole:   return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_true:      return li2.tag == tag_true;
