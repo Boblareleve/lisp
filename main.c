@@ -1,16 +1,22 @@
 #include "lisp.h"
 
 DA_TYPEDEF_ARRAY(List);
-bool test_eval(const da_List lis)
+bool test_eval(List root)
 {
-    Lisp_context ctx = Lisp_context_init();
-    if (da_first(&lis).tag == tag_symbole 
-     && List_str_equal(da_first(&lis), "ERROR")
+    Lisp_context ctx = Lisp_context_init(root);
+    if (root.size == 0)
+    {
+        Lisp_context_free(&ctx);
+        return true;
+    }
+    
+    if (root.list[0].tag == tag_symbole 
+     && List_equal_lit(root.list[0], "ERROR")
     ) { // expect error
-        for (int i = 1; i < lis.size; i++)
+        for (int i = 1; i < root.size; i++)
         {
             List tmp = {0};
-            if (!eval(&ctx, lis.arr[i], &tmp))
+            if (!eval(&ctx, root.list[i], &tmp))
             {
                 Lisp_context_free(&ctx);
                 return true;
@@ -19,18 +25,16 @@ bool test_eval(const da_List lis)
         fprintf(stderr, "no error while expecting one\t");
         goto fail;
     }
+
     List expect = {0};
-    GOTRY(eval(&ctx, da_first(&lis), &expect), 
-        fprintf(stderr, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view));
-    );
+    GOTRY(eval(&ctx, root.list[0], &expect), fprintf(stderr, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+    
     // last expected to be equal to "expect"
     List tmp = (List){0};
-    for (int i = 1; i < lis.size; i++)
+    for (int i = 1; i < root.size; i++)
     {
         tmp = (List){0};
-        GOTRY(eval(&ctx, lis.arr[i], &tmp), 
-            fprintf(stderr, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view));
-        );
+        GOTRY(eval(&ctx, root.list[i], &tmp), fprintf(stderr, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
     }
     GOTRY(List_equal(expect, tmp),
         fprintf(stderr, "unexpected result got: ");
@@ -39,7 +43,7 @@ bool test_eval(const da_List lis)
         List_print(expect);
         fprintf(stderr, "\t");
     );
-
+    
     Lisp_context_free(&ctx);
     return true;
 fail:
@@ -49,76 +53,21 @@ fail:
 }
 
 
-Ar arena = {0};
 
 bool test(const Strv str)
 {
     if (str.size == 0)
         return true;   
-    da_List lis = {0};
-    Strv it = *(Strv*)&str;
-    while (it.size > 0)
-    {
-        skip_space(&it);
-        if (Strv_first(it) == ';')
-        {
-            skip_comment(&it);
-            continue;
-        }
-        if (it.size <= 0) break;
-
-        da_push_zero(&lis);
-        GOTRY(list(&arena, &it, &da_top(&lis)),
-            fprintf(stderr, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view));
-        );
-    }
+    List root = {0};
     
-    // copy
-
-    da_List cpy = {0};
-    bool do_copy = false;
-    if (do_copy)
-    {
-        da_for (List, it, &lis)
-            da_push(&cpy, List_copy(&arena, *it));
-    }
+    TRY(lists(str, &root), fprintf(stderr, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view)); error.size = 0;);
     
     
     // run
-    const int samples = 1;
-    for (int _ = 0; _ < samples; _++)
-        GOTRY(test_eval(lis));
-
-    
-    if (do_copy)
-    {
-        bool some_changes = false;
-        for (int i = 0; i < cpy.size; i++)
-            if (!List_equal(cpy.arr[i], lis.arr[i])) 
-            {
-                fprintf(stderr, "code have change\t");
-                some_changes = true;
-            }
-        if (!some_changes) fprintf(stderr, "no code changes\t");
-    }
-    
-    da_for (List, it, &lis)
-        List_free(it);
-    da_free(&lis);
-
-    if (do_copy)
-    {
-        da_for (List, it, &cpy)
-            List_free(it);
-        da_free(&cpy);
-    }
+    TRY(test_eval(root), error.size = 0);
 
     error.size = 0;
     return true;
-fail:
-    error.size = 0;
-    da_free(&lis);
-    return false;
 }
 
 

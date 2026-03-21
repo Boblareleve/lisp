@@ -13,7 +13,7 @@
 #define AR_MAX_ALIGN 8
 #include "ar_virt.h"
 
-typedef enum __attribute__((packed)) List_tag
+typedef enum List_tag : uint8_t
 {
     tag_list = 0,  // (a a a)|()
     tag_true,      // t
@@ -23,8 +23,7 @@ typedef enum __attribute__((packed)) List_tag
     // tag_slice,     
     // tag_integer
     // tag_...
-} __attribute__((packed)) List_tag;
-static_assert(sizeof(List_tag) == 1);
+} List_tag;
 
 
 #define NIL_LIST (List){0}
@@ -41,12 +40,9 @@ struct List
     List_tag tag;
     uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
     
-    // union {
-    //     struct {
-            uint16_t offset; // only to get back the Rc_container
-            uint16_t size;   
-    //     };
-    // };
+    uint16_t offset; // only to get back the start of the allocated chunk
+    uint16_t size;
+
     
     union {
         List *list;
@@ -62,13 +58,14 @@ static_assert(sizeof(List) == 16);
 typedef struct Variable
 {
     List value;
-    Strv name;
+    List name;
 } Variable;
 DA_TYPEDEF_ARRAY(Variable);
 
 SET_TYPEDEF_HASH_SET(Variable);
 
 
+DA_TYPEDEF_ARRAY_PTR(void);
 DA_TYPEDEF_ARRAY(da_Variable);
 typedef struct Lisp_context
 {
@@ -80,11 +77,12 @@ typedef struct Lisp_context
     da_da_Variable args_stack;
     bool in_return; // indicate that the error is only a return mechanism
 
-    Ar arena;
+    List root;
+
+    da_ptr_void gc;
     // Strb error;
 } Lisp_context;
 
-#include "rc.h"
 
 
 extern Strb error;
@@ -97,20 +95,47 @@ do {\
 #define get_error() (error.view)
 #define reset_error() (error.size)
 
+static inline const char *tag_to_string(int tag)
+{
+    static const char *table[] = {
+        [tag_true]      = "tag_true",
+        [tag_symbole]   = "tag_symbole",
+        [tag_string]    = "tag_string",
+        [tag_number]    = "tag_number",
+        [tag_list]      = "tag_list",
+    };
+    return table[tag];
+}
+static inline void *List_get_ptr(const List *li)
+{
+    if (li->tag == tag_list)
+        return li->list - li->offset;
+    if (li->tag == tag_symbole || li->tag == tag_string)
+        return li->str - li->offset;
+
+    return NULL;
+}
+
+#define List_to_Strv(li) (assert((li).tag == tag_string), (Strv){ .arr = (li).str, .size = (li).size })
+#define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))
+#define List_equal_lit(li, lit) Strv_equal_lit(List_to_Strv(li), lit)
 
 
-bool list(Ar *arena, Strv *str, List *li);
+bool list(Strv *str, List *li);
+bool lists(Strv str, List *li);
 bool dump(Strb *out, const List li);
 bool List_print(const List li);
 bool eval(Lisp_context *ctx, const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
-List List_copy(Ar *arena, const List li);
-Lisp_context Lisp_context_init(void);
+List List_copy(const List li);
+Lisp_context Lisp_context_init(List root);
 void Lisp_context_free(Lisp_context *ctx);
 
 void skip_space(Strv *str);
 void skip_comment(Strv *str);
 
+
+#include "memory.h"
 
 #endif /* LISP_H */

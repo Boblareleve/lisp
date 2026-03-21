@@ -3,19 +3,21 @@
 WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wno-address'
 
 OUT=lisp_d
+SRC='main.c lisp.c dump.c parse.c'
+
 
 case $1 in
     release)
         OUT=lisp_r
-        gcc -DNDEBUG main.c lisp.c -o $OUT -I$MY_LIB -lm $WFLAGS
+        gcc -DNDEBUG $SRC -o $OUT -I$MY_LIB -lm $WFLAGS
     ;;
     debug)
         OUT=lisp_d
-        gcc -DDEBUG main.c lisp.c  -o $OUT -I$MY_LIB -lm -ggdb $WFLAGS
+        gcc -DDEBUG $SRC  -o $OUT -I$MY_LIB -lm -ggdb $WFLAGS
     ;;
     sanitized)
         OUT=lisp_s
-        gcc -DDEBUG main.c lisp.c  -o $OUT -I$MY_LIB -g3 -lm -fsanitize=address -fsanitize=undefined $WFLAGS
+        gcc -DDEBUG $SRC  -o $OUT -I$MY_LIB -g3 -lm -fsanitize=address -fsanitize=undefined $WFLAGS
     ;;
     _)
     ;;

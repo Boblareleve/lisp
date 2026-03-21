@@ -15,6 +15,7 @@
         (= a (next a))
         (= b (next b))
     )
+    res
 ))
 
 (&&
