@@ -55,14 +55,11 @@ Variable *get_Variable(Lisp_context *ctx, List name)
 // return index in the call stack
 size_t local_Variable(Lisp_context *ctx, Variable var)
 {
-    Rc_inc_List(var.value);
-
     da_Variable *frame = &da_top(&ctx->args_stack);
     if (ctx->args_stack.size > 0)
         da_for (Variable, it, frame)
             if (List_str_equal(it->name, var.name))
             {
-                Rc_dec_List(it->value);
                 *it = var;
                 return da_idx_for(it, frame);
             }
@@ -74,8 +71,6 @@ size_t local_Variable(Lisp_context *ctx, Variable var)
 // return true if it remplace a global variable
 bool global_Variable(Lisp_context *ctx, Variable var)
 {
-    Rc_inc_List(var.value);
-
     // set or replace variable var.name
     Variable *old = set_Variable_emplace(&ctx->variables, var);
     *old = var;
@@ -177,9 +172,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     } return true;
 
     case tag_symbole: {
-
-        Strv key = List_to_Strv(li);
-        
+                
         Variable *var = get_Variable(ctx, li);
         if (var)
         {

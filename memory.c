@@ -4,7 +4,8 @@
 
 void *List_alloc(Lisp_context *ctx, size_t count)
 {
-    if (!ctx) return calloc(count, 1); // if no context -> allocation in the parsing phase the allocation will be register only on program startup
+    if (!ctx)
+        return calloc(count, 1); // if no context -> allocation in the parsing phase the allocation will be register only on program startup
     
     void *mem = calloc(count, 1);
     da_push(&ctx->gc, mem);
@@ -17,6 +18,7 @@ void *List_duplicate(Lisp_context *ctx, void *src, size_t count)
     void *new = List_alloc(ctx, count);
     return memcpy(new, src, count);
 }
+
 
 
 
@@ -66,6 +68,8 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
 
 bool garbage_collector(Lisp_context *ctx)
 {
+    TRY(ctx);
+    
     da_qsort(&ctx->gc, void_ptr_cmp);
 
     gc_traverse_mark(ctx, ctx->root);
@@ -77,11 +81,9 @@ bool garbage_collector(Lisp_context *ctx)
         if (is_gc_tag(ctx->gc.arr[i]))
         {
             ctx->gc.arr[i] = gc_untag(ctx->gc.arr[i]);
-
         }
         else if (i + 1 != ctx->gc.size)
         {
-            
             shift++;
             ctx->gc.arr[i] = ctx->gc.arr[i + shift];
             ctx->gc.size--;
@@ -91,4 +93,6 @@ bool garbage_collector(Lisp_context *ctx)
         shift, (shift + ctx->gc.size), 
         (float)shift / (shift + ctx->gc.size)
     );
+
+    return true;
 }

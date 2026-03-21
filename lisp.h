@@ -128,12 +128,13 @@ bool List_print(const List li);
 bool eval(Lisp_context *ctx, const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
-List List_copy(const List li);
+List List_copy(Lisp_context *ctx, const List li);
 Lisp_context Lisp_context_init(List root);
 void Lisp_context_free(Lisp_context *ctx);
 
-void skip_space(Strv *str);
-void skip_comment(Strv *str);
+void *List_alloc(Lisp_context *ctx, size_t count);
+void *List_duplicate(Lisp_context *ctx, void *src, size_t count);
+bool garbage_collector(Lisp_context *ctx);
 
 
 #include "memory.h"

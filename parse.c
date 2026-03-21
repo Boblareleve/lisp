@@ -43,7 +43,7 @@ Strv get_pair(Strv str)
 
     GOTRY_consume(&str);
     int depth = 1;
-    while (depth > 0)
+    while (depth > 0 && str.size > 0)
     {
         skip_comment(&str);
         if (Strv_first(str) == '(')
@@ -59,11 +59,12 @@ Strv get_pair(Strv str)
                 // advance
                 GOTRY_consume(&str);
             } while (Strv_first(str) != '"');
-        } 
+        }
         
-        GOTRY_consume(&str);
+        Strv_inc(&str);
     }
-
+    GOTRY(depth == 0);
+    
     res = str;
 fail:
     return res;
@@ -84,82 +85,75 @@ bool skip_atom(Strv *str)
 
 
 
-ssize_t list_count(Strv str)
-{    
-    GOTRY(Strv_first(str) == '(');
-    GOTRY_consume(&str);
-    skip_comment(&str);  // not needed ? 
-    GOTRY(str.size > 0);
-
-
+ssize_t list_body_count(Strv *str)
+{
     ssize_t count = 0;
-    while (Strv_first(str) != ')')
-    {
-        skip_comment(&str);
-        GOTRY(str.size > 0);
 
-        if (Strv_first(str) == '(')
+    skip_comment(str);
+
+    while (str->size > 0 && Strv_first(*str) != ')')
+    {
+        if (Strv_first(*str) == '(')
         {
-            GOTRY(skip_parent(&str));
-            skip_comment(&str);
-            GOTRY(str.size > 0);
+            GOTRY(skip_parent(str));
+            skip_comment(str);
             count++;
             continue;
         }
-        if (Strv_first(str) == '"')  // string with escape character
+        if (Strv_first(*str) == '"')  // string with escape character
         {
             do {
-                GOTRY_consume(&str);
-                if (Strv_first(str) == '\\')
+                GOTRY_consume(str);
+                if (Strv_first(*str) == '\\')
                 {
-                    GOTRY_consume(&str);
-                    GOTRY_consume(&str);
+                    GOTRY_consume(str);
+                    GOTRY_consume(str);
                 }
-            }
-            while (str.size > 0 && Strv_first(str) != '"');
-            GOTRY_consume(&str);
-            skip_comment(&str);
-            GOTRY(str.size > 0);
+            } while (str->size > 0 && Strv_first(*str) != '"');
+
+            GOTRY_consume(str);
+            skip_comment(str);
             count++;
             continue;
         }
-        if (Strv_first(str) == '\'') // reference
+        if (Strv_first(*str) == '\'') // reference
         {
-            do GOTRY_consume(&str); while (Strv_first(str) == '\'');
+            do GOTRY_consume(str); while (Strv_first(*str) == '\'');
             continue;
-            // skip_comment(&str);
-            // GOTRY(str.size > 0, error_log("expected atom after reference (') got EOF"));
         }
 
-
-        GOTRY(skip_atom(&str));
-        skip_comment(&str);
-        GOTRY(str.size > 0);
+        GOTRY(skip_atom(str));
+        skip_comment(str);
         count++;
     }
 
     return count;
 fail:
-    return -count;
+    return -1;
 }
 
-void test_list_count(void)
+ssize_t list_count(Strv str)
 {
-    assert(list_count(Strv_lit("()")) == 0);
-    assert(list_count(Strv_lit("(a)")) == 1);
-    assert(list_count(Strv_lit("(a aa)")) == 2);
-    assert(list_count(Strv_lit("(  dqfs  d dd)")) == 3);
-    assert(list_count(Strv_lit("((dq dd dd) a)")) == 2);
-    assert(list_count(Strv_lit("((dq \"(\" dd) a)")) == 2);
-    assert(list_count(Strv_lit("(('dq '''a) a '(a bdd (aad d)))")) == 3);
+    ssize_t count = 0;
+
+    GOTRY(Strv_first(str) == '(');
+    GOTRY_consume(&str);
     
+    count = list_body_count(&str);
+
+    GOTRY(Strv_first(str) == ')');
+    GOTRY_consume(&str);
+
+    return count;
+fail:
+    return -1;
 }
 
 List escaping(Strv str)
 {
     char buffer[512];
     Strv res = Strv_make(
-        (str.size < sizeof(buffer)) ? buffer : malloc(str.size), // fallback to malloc if too large
+        (str.size < (int)sizeof(buffer)) ? buffer : malloc(str.size), // fallback to malloc if too large
         0
     );
 
@@ -191,7 +185,7 @@ List escaping(Strv str)
         .size = res.size,
         .str = List_duplicate(NULL, res.arr, res.size)
     };
-    if (str.size >= sizeof(buffer)) free(res.arr);
+    if (str.size >= (int)sizeof(buffer)) free(res.arr);
     return result;
 }
 
@@ -312,12 +306,13 @@ bool lists(Strv str, List *li)
     skip_comment(&str);
 
     li->tag = tag_list;
-    ssize_t count = list_count(str);
-    TRY(count > 0, error_log("root count error"));
+    ssize_t count = list_body_count(&(Strv){ .arr = str.arr, .size = str.size });
+
+    TRY(count >= 0, error_log("root count error"));
     li->list = List_alloc(NULL, count * sizeof(List));
     li->size = 0;
 
-    while (li->size < count && str.size > 0);
+    while (li->size < count && str.size > 0)
     {
         li->list[li->size] = NIL_LIST;
         TRY(list(&str, &li->list[li->size]));
