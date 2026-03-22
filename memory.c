@@ -13,6 +13,16 @@ void *List_alloc(Lisp_context *ctx, size_t count)
     return mem;
 }
 
+void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count)
+{
+    UNUSED(count);
+    if (!ctx)
+        return ptr;
+
+    da_push(&ctx->gc, ptr);
+    return ptr;
+}
+
 void *List_duplicate(Lisp_context *ctx, void *src, size_t count)
 {
     void *new = List_alloc(ctx, count);
@@ -35,7 +45,6 @@ void *gc_untag(void *ptr)
 {
     return (void*)((uintptr_t)ptr & ~GC_TAG);
 }
-
 
 
 

@@ -1,6 +1,6 @@
 #include "lisp.h"
 
-DA_TYPEDEF_ARRAY(List);
+// DA_TYPEDEF_ARRAY(List);
 bool test_eval(List root)
 {
     Lisp_context ctx = Lisp_context_init(root);
@@ -26,6 +26,7 @@ bool test_eval(List root)
         goto fail;
     }
 
+    
     List expect = {0};
     GOTRY(eval(&ctx, root.list[0], &expect), fprintf(stderr, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
     
@@ -37,11 +38,11 @@ bool test_eval(List root)
         GOTRY(eval(&ctx, root.list[i], &tmp), fprintf(stderr, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
     }
     GOTRY(List_equal(expect, tmp),
-        fprintf(stderr, "unexpected result got: ");
+        fprintf(stderr, "unexpected result got: '");
         List_print(tmp);
-        fprintf(stderr, "  expecting: ");
+        fprintf(stderr, "'  expecting: '");
         List_print(expect);
-        fprintf(stderr, "\t");
+        fprintf(stderr, "'\t");
     );
     
     Lisp_context_free(&ctx);

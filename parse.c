@@ -1,5 +1,7 @@
 #include "lisp.h"
 
+Ar arena = {0};
+
 #define GOTRY_consume(str) GOTRY(consume(str), error_log("unexpected EOF"))
 bool consume(Strv *str)
 {
@@ -84,7 +86,7 @@ bool skip_atom(Strv *str)
 }
 
 
-
+/* 
 ssize_t list_body_count(Strv *str)
 {
     ssize_t count = 0;
@@ -148,6 +150,8 @@ ssize_t list_count(Strv str)
 fail:
     return -1;
 }
+ */
+
 
 List escaping(Strv str)
 {
@@ -190,46 +194,58 @@ List escaping(Strv str)
 }
 
 
-
 bool list(Strv *str, List *li)
 {
+    
+
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
     TRY(str->size > 0, error_log("empty input"));
     
-    skip_space(str);
     skip_comment(str);
 
     if (Strv_first(*str) == '(')
     {
         li->tag = tag_list;
-        ssize_t count = list_count(*str);
-        TRY(count < 0, error_log("count error"));
+        // ssize_t count = list_count(*str);
+        // TRY(count < 0, error_log("count error"));
         
         TRY(consume(str), error_log("EOF"));
         skip_comment(str);
         TRY(str->size > 0, error_log("EOF"));
         
-        if (count == 0)
+        if (Strv_first(*str) == ')')
         {
             *li = NIL_LIST;
             Strv_inc(str); // can't be the end of file
             return true;
         }
 
-        const Strv save = *str;
+        // const Strv save = *str;
+        Ar_save_point save = Ar_save(&arena);
         
-        li->list = List_alloc(NULL, count * sizeof(List));
+        int capacity = 1;
+        li->list = Ar_calloc(&arena, capacity * sizeof(List));
         li->size = 0;
         do {
-            li->list[li->size] = NIL_LIST;
+            if (capacity < li->size + 1)
+            {
+                li->list = Ar_crealloc(&arena, li->list, capacity * sizeof(List), (capacity + 4) * sizeof(List));
+                capacity += 4;
+            }
+            
+            // li->list[li->size] = NIL_LIST;
+            assert(li->list);
             TRY(list(str, &li->list[li->size]));
             li->size++;
             skip_comment(str);
-        } while (li->size < count && str->size > 0 && Strv_first(*str) != ')');
-        TRY(li->size == count, error_log("invalid list element count, expected %d got %d with: %sv", count, li->size, &save));
-        TRY(Strv_first(*str) == ')', error_log("unexpected EOF or underestimate list_count() counted %d but there is more", count));
+        } while (str->size > 0 && Strv_first(*str) != ')');
         Strv_inc(str);
+        // TRY(consume(str), error_log("unexpected EOF"));
+
+        li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
+        Ar_restore(&arena, save);
+
         return true;
     }
     if (isdigit(Strv_first(*str)) || (is_unary_sign(Strv_first(*str)) && isdigit(Strv_char_at(*str, 1))))
@@ -296,31 +312,45 @@ bool list(Strv *str, List *li)
         .str = List_duplicate(NULL, symbole.arr, symbole.size),
         .size = symbole.size
     };
-    
-    
     return true;
 }
 
 bool lists(Strv str, List *li)
 {
+    Ar_save_point save = Ar_save(&arena);
+
     skip_comment(&str);
 
     li->tag = tag_list;
-    ssize_t count = list_body_count(&(Strv){ .arr = str.arr, .size = str.size });
+    // ssize_t count = list_body_count(&(Strv){ .arr = str.arr, .size = str.size });
 
-    TRY(count >= 0, error_log("root count error"));
-    li->list = List_alloc(NULL, count * sizeof(List));
+    // TRY(count >= 0, error_log("root count error"));
+    // li->list = List_alloc(NULL, count * sizeof(List));
+    // li->size = 0;
+
+    int capacity = 1;
+    li->list = Ar_calloc(&arena, capacity * sizeof(List));
     li->size = 0;
-
-    while (li->size < count && str.size > 0)
+    while (str.size > 0)
     {
-        li->list[li->size] = NIL_LIST;
+        if (capacity < li->size + 1)
+        {
+            li->list = Ar_crealloc(&arena, li->list, capacity * sizeof(List), (capacity + 4) * sizeof(List));
+            capacity += 4;
+        }
+        
+        // assert(li->list);
+        // li->list[li->size] = NIL_LIST;
         TRY(list(&str, &li->list[li->size]));
         li->size++;
 
         skip_comment(&str);
     }
 
-    TRY(li->size == count, error_log("invalid list element count in root, expected %d got %d", count, li->size));
+    li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
+    // li->size = count;
+
+    Ar_restore(&arena, save);
+    // TRY(li->size == count, error_log("invalid list element count in root, expected %d got %d", count, li->size));
     return true;
 }

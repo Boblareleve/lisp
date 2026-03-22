@@ -116,7 +116,7 @@ static inline void *List_get_ptr(const List *li)
     return NULL;
 }
 
-#define List_to_Strv(li) (assert((li).tag == tag_string), (Strv){ .arr = (li).str, .size = (li).size })
+#define List_to_Strv(li) (assert((li).tag == tag_string || (li).tag == tag_symbole), (Strv){ .arr = (li).str, .size = (li).size })
 #define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))
 #define List_equal_lit(li, lit) Strv_equal_lit(List_to_Strv(li), lit)
 
@@ -133,6 +133,7 @@ Lisp_context Lisp_context_init(List root);
 void Lisp_context_free(Lisp_context *ctx);
 
 void *List_alloc(Lisp_context *ctx, size_t count);
+void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count);
 void *List_duplicate(Lisp_context *ctx, void *src, size_t count);
 bool garbage_collector(Lisp_context *ctx);
 

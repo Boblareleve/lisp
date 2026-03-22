@@ -56,7 +56,7 @@ Variable *get_Variable(Lisp_context *ctx, List name)
 size_t local_Variable(Lisp_context *ctx, Variable var)
 {
     da_Variable *frame = &da_top(&ctx->args_stack);
-    if (ctx->args_stack.size > 0)
+if (ctx->args_stack.size > 0)
         da_for (Variable, it, frame)
             if (List_str_equal(it->name, var.name))
             {
@@ -172,7 +172,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     } return true;
 
     case tag_symbole: {
-                
+
         Variable *var = get_Variable(ctx, li);
         if (var)
         {
@@ -201,7 +201,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(eval_function(ctx, li, NULL, out), error_log("failed to call inline function"));
             return true;
         }
-
+        
         // TODO transform into an prefect hash table
         // uint16_t a = *(uint16_t)&op.str.arr;
         
@@ -608,7 +608,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         { // catstr
             TRY(li.size >= 2);
 
-            Strb acc = {0};
+            static Strb acc = {0};
+            acc.size = 0;
 
             for (int i = 1; i < li.size; i++)
             {
@@ -618,12 +619,16 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             }
 
             // Strb_fit(&acc);
+            // acc.arr = List_delc_alloc(ctx, acc.arr, acc.size);
+
+
+            // Strb_fit(&acc);
             *out = (List){
                 .tag = tag_string,
                 .size = acc.size,
                 .str = List_duplicate(ctx, acc.arr, acc.size)
             };
-
+            // Strb_free(acc);
             return true;
         }
         if (List_equal_lit(op, "quote"))
@@ -763,15 +768,21 @@ Lisp_context Lisp_context_init(List root)
 
 void Lisp_context_free(Lisp_context *ctx)
 {
+    assert(ctx->args_stack.size >= 1);
+    da_free(&ctx->args_stack.arr[0]);
     da_free(&ctx->args_stack);
     
-    set_for (Variable, it, &ctx->variables)
-        List_free(&it->value);
+    // set_for (Variable, it, &ctx->variables)
+    //     List_free(&it->value);
     
     set_Variable_free(&ctx->variables);
     
-    set_for (Variable, it, &ctx->functions)
-        List_free(&it->value);
+    // set_for (Variable, it, &ctx->functions)
+    //     List_free(&it->value);
     set_Variable_free(&ctx->functions);
+
+    da_for (void *, it, &ctx->gc)
+        free(*it);
+    da_free(&ctx->gc);
 }
 

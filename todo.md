@@ -9,4 +9,4 @@
                   ("default")
                ))
  + test [] (index)
- + 
+ + see 'static Strb' if they are ok
