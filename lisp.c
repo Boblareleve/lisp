@@ -137,15 +137,15 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     
     // return the last one
     GOTRY(eval(ctx, func_def.list[func_def.size-1], out));
+    
 
 end:
     res = true;
 fail:
-    if (da_top(&ctx->args_stack).size > 1) // first stack frame should never be pop
-    {
-        da_free(&da_top(&ctx->args_stack));
-        ctx->args_stack.size--;
-    }
+    assert(ctx->args_stack.size > 0);
+    TRY(ctx->args_stack.size > 0, error_log("return from root"));
+    da_free(&da_top(&ctx->args_stack));
+    ctx->args_stack.size--;
     return res;
 }
 
@@ -195,7 +195,6 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         }
 
         const List op = *li.list; 
-        // TRY(op.tag == tag_symbole, error_log("evaluating a list that doesn't start with a symbole"));
         if (op.tag != tag_symbole)
         { // can be an inline function
             TRY(eval_function(ctx, li, NULL, out), error_log("failed to call inline function"));
@@ -705,20 +704,6 @@ List List_copy(Lisp_context *ctx, const List li)
         
         return res;
     }
-    // string are immutable
-    // if (li.tag == tag_string)
-    // {
-    //     List res = {
-    //         .tag = tag_string,
-    //         .quote_count = li.quote_count,
-    //         .offset = 0,
-    //         .size = li.size,
-    //         .str = List_duplicate(ctx, li.str, li.size)
-    //     };
-    //     return res;
-    // }
-    // tag_symbole have a static lifetime for now. To see for meta programming 
-
     return li;
 }
 
@@ -771,18 +756,13 @@ void Lisp_context_free(Lisp_context *ctx)
     assert(ctx->args_stack.size >= 1);
     da_free(&ctx->args_stack.arr[0]);
     da_free(&ctx->args_stack);
-    
-    // set_for (Variable, it, &ctx->variables)
-    //     List_free(&it->value);
-    
-    set_Variable_free(&ctx->variables);
-    
-    // set_for (Variable, it, &ctx->functions)
-    //     List_free(&it->value);
-    set_Variable_free(&ctx->functions);
 
+    set_Variable_free(&ctx->variables);
+    set_Variable_free(&ctx->functions);
+    
     da_for (void *, it, &ctx->gc)
         free(*it);
+
     da_free(&ctx->gc);
 }
 

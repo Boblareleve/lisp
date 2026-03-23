@@ -29,7 +29,7 @@ bool test_eval(List root)
     
     List expect = {0};
     GOTRY(eval(&ctx, root.list[0], &expect), fprintf(stderr, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
-    
+
     // last expected to be equal to "expect"
     List tmp = (List){0};
     for (int i = 1; i < root.size; i++)
@@ -44,7 +44,10 @@ bool test_eval(List root)
         List_print(expect);
         fprintf(stderr, "'\t");
     );
-    
+
+    // ctx.root = NIL_LIST;
+    garbage_collector(&ctx);
+
     Lisp_context_free(&ctx);
     return true;
 fail:
@@ -62,7 +65,6 @@ bool test(const Strv str)
     List root = {0};
     
     TRY(lists(str, &root), fprintf(stderr, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view)); error.size = 0;);
-    
     
     // run
     TRY(test_eval(root), error.size = 0);
@@ -92,6 +94,8 @@ int main(int argc, char **argv)
 
         Strb_free(raw);
     }
+    Strb_free(error);
+
+
     return 0;
 }
-

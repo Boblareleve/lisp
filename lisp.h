@@ -109,10 +109,10 @@ static inline const char *tag_to_string(int tag)
 static inline void *List_get_ptr(const List *li)
 {
     if (li->tag == tag_list)
-        return li->list - li->offset;
+        return (void*)(li->list - (uintptr_t)li->offset);
     if (li->tag == tag_symbole || li->tag == tag_string)
-        return li->str - li->offset;
-
+        return (void*)(li->str - (uintptr_t)li->offset);
+    
     return NULL;
 }
 

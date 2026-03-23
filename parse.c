@@ -86,72 +86,6 @@ bool skip_atom(Strv *str)
 }
 
 
-/* 
-ssize_t list_body_count(Strv *str)
-{
-    ssize_t count = 0;
-
-    skip_comment(str);
-
-    while (str->size > 0 && Strv_first(*str) != ')')
-    {
-        if (Strv_first(*str) == '(')
-        {
-            GOTRY(skip_parent(str));
-            skip_comment(str);
-            count++;
-            continue;
-        }
-        if (Strv_first(*str) == '"')  // string with escape character
-        {
-            do {
-                GOTRY_consume(str);
-                if (Strv_first(*str) == '\\')
-                {
-                    GOTRY_consume(str);
-                    GOTRY_consume(str);
-                }
-            } while (str->size > 0 && Strv_first(*str) != '"');
-
-            GOTRY_consume(str);
-            skip_comment(str);
-            count++;
-            continue;
-        }
-        if (Strv_first(*str) == '\'') // reference
-        {
-            do GOTRY_consume(str); while (Strv_first(*str) == '\'');
-            continue;
-        }
-
-        GOTRY(skip_atom(str));
-        skip_comment(str);
-        count++;
-    }
-
-    return count;
-fail:
-    return -1;
-}
-
-ssize_t list_count(Strv str)
-{
-    ssize_t count = 0;
-
-    GOTRY(Strv_first(str) == '(');
-    GOTRY_consume(&str);
-    
-    count = list_body_count(&str);
-
-    GOTRY(Strv_first(str) == ')');
-    GOTRY_consume(&str);
-
-    return count;
-fail:
-    return -1;
-}
- */
-
 
 List escaping(Strv str)
 {
@@ -207,8 +141,6 @@ bool list(Strv *str, List *li)
     if (Strv_first(*str) == '(')
     {
         li->tag = tag_list;
-        // ssize_t count = list_count(*str);
-        // TRY(count < 0, error_log("count error"));
         
         TRY(consume(str), error_log("EOF"));
         skip_comment(str);
@@ -221,7 +153,6 @@ bool list(Strv *str, List *li)
             return true;
         }
 
-        // const Strv save = *str;
         Ar_save_point save = Ar_save(&arena);
         
         int capacity = 1;
@@ -234,14 +165,12 @@ bool list(Strv *str, List *li)
                 capacity += 4;
             }
             
-            // li->list[li->size] = NIL_LIST;
             assert(li->list);
             TRY(list(str, &li->list[li->size]));
             li->size++;
             skip_comment(str);
         } while (str->size > 0 && Strv_first(*str) != ')');
         Strv_inc(str);
-        // TRY(consume(str), error_log("unexpected EOF"));
 
         li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
         Ar_restore(&arena, save);
@@ -322,12 +251,7 @@ bool lists(Strv str, List *li)
     skip_comment(&str);
 
     li->tag = tag_list;
-    // ssize_t count = list_body_count(&(Strv){ .arr = str.arr, .size = str.size });
-
-    // TRY(count >= 0, error_log("root count error"));
-    // li->list = List_alloc(NULL, count * sizeof(List));
-    // li->size = 0;
-
+    
     int capacity = 1;
     li->list = Ar_calloc(&arena, capacity * sizeof(List));
     li->size = 0;
@@ -339,8 +263,6 @@ bool lists(Strv str, List *li)
             capacity += 4;
         }
         
-        // assert(li->list);
-        // li->list[li->size] = NIL_LIST;
         TRY(list(&str, &li->list[li->size]));
         li->size++;
 
@@ -348,9 +270,7 @@ bool lists(Strv str, List *li)
     }
 
     li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
-    // li->size = count;
 
     Ar_restore(&arena, save);
-    // TRY(li->size == count, error_log("invalid list element count in root, expected %d got %d", count, li->size));
     return true;
 }
