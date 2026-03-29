@@ -45,9 +45,6 @@ bool test_eval(List root)
         fprintf(stderr, "'\t");
     );
 
-    // ctx.root = NIL_LIST;
-    garbage_collector(&ctx);
-
     Lisp_context_free(&ctx);
     return true;
 fail:

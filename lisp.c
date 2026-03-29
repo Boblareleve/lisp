@@ -726,10 +726,10 @@ void List_free(List *li)
 }
 
 
-da_ptr_void add_to_gc_context(da_ptr_void gc, List root)
+set_void_ptr add_to_gc_context(set_void_ptr gc, List root)
 {
     if (List_get_ptr(&root))
-        da_push(&gc, List_get_ptr(&root));
+        set_void_ptr_insert(&gc, List_get_ptr(&root));
 
     if (root.tag == tag_list)
         for (int i = 0; i < root.size; i++)
@@ -742,7 +742,7 @@ Lisp_context Lisp_context_init(List root)
 {
     assert(root.tag == tag_list);
     Lisp_context res = {
-        .gc = add_to_gc_context((da_ptr_void){0}, root),
+        .gc = add_to_gc_context((set_void_ptr){0}, root),
         .root = root,
     };
     da_push_zero(&res.args_stack);
@@ -754,15 +754,30 @@ Lisp_context Lisp_context_init(List root)
 void Lisp_context_free(Lisp_context *ctx)
 {
     assert(ctx->args_stack.size >= 1);
-    da_free(&ctx->args_stack.arr[0]);
-    da_free(&ctx->args_stack);
 
-    set_Variable_free(&ctx->variables);
-    set_Variable_free(&ctx->functions);
+    { // free memory not tracked by gc
+        da_for (da_Variable, it, &ctx->args_stack)
+            da_free(it);
+        da_free(&ctx->args_stack);
     
-    da_for (void *, it, &ctx->gc)
-        free(*it);
+        set_Variable_free(&ctx->functions);
+        set_Variable_free(&ctx->variables);
+        ctx->root = NIL_LIST;
+    }
 
-    da_free(&ctx->gc);
+    // GGGGGGGGGGGGGC!!
+    garbage_collector(ctx);
+
+    
+    set_void_ptr_free(&ctx->gc);
+
+
+    // da_free(&ctx->args_stack.arr[0]);
+    // da_free(&ctx->args_stack);
+    // set_Variable_free(&ctx->variables);
+    // set_Variable_free(&ctx->functions);
+    // da_for (void *, it, &ctx->gc)
+    //     free(*it);
+    // da_free(&ctx->gc);
 }
 

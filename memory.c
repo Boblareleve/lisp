@@ -2,6 +2,28 @@
 
 // 00 00  00 00   00 00  00 00
 
+
+int set_void_ptr_equal(const void_ptr a, const void_ptr b)
+{
+    return a == b;
+}
+uint64_t set_void_ptr_hash(const void_ptr key, uint64_t seed)
+{ // 0b1000
+    return ((uint64_t)key >> 3) ^ seed;
+}
+
+// 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+// 0 1 2 3 4 5 6 7 8 9 a b c d e f
+// 0 1 10 11 100 101 110 111 1000
+
+#define ISNULL_VPTR(ptr) ((ptr) == NULL)
+#define SETNULL_VPTR(ptr) ((ptr) = NULL)
+
+
+SET_IMPLEMENT_HASH_SET(void_ptr, ISNULL_VPTR, SETNULL_VPTR, 4, 0.8, 64);
+
+
+
 void *List_alloc(Lisp_context *ctx, size_t count)
 {
     void *mem = calloc(count, 1);
@@ -10,7 +32,7 @@ void *List_alloc(Lisp_context *ctx, size_t count)
         return mem;
     
     
-    da_push(&ctx->gc, mem);
+    set_void_ptr_insert(&ctx->gc, mem);
 
     return mem;
 }
@@ -24,7 +46,7 @@ void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count)
     if (!ctx)
         return ptr;
 
-    da_push(&ctx->gc, ptr);
+    set_void_ptr_insert(&ctx->gc, ptr);
     return ptr;
 }
 
@@ -68,10 +90,10 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
         void *ptr = List_get_ptr(&li);
         if (!ptr) return; // if not something allocated return
         
-        void **f = da_bsearch(&ctx->gc, &ptr, void_ptr_cmp);
+        void **f = set_void_ptr_get(&ctx->gc, ptr);
         if (!f)
         {
-            assert(da_bsearch(&ctx->gc, &(void*){gc_tag(ptr)}, void_ptr_cmp)); // check if the value was already poisoned if not the allocation wasn't reported as it should
+            assert(set_void_ptr_contains(&ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
             return; // if it was not found -> already poisoned
         }
         
@@ -85,15 +107,91 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
 
 
 
-
-bool garbage_collector(Lisp_context *ctx)
+// bool set_##TK##_erase(set_##TK *obj, TK val)
+// {
+//     const int index_erase = _set_##TK##_where(obj, val);
+//     if (IS_NULL(obj->arr[index_erase]))
+//         return false;
+//     SET_NULL(obj->arr[index_erase]);
+//     obj->size--;
+//     
+//     int it = (index_erase + 1) % obj->capacity;
+//     while (!IS_NULL(obj->arr[it]))
+//     { /* if it is already at the good place there still could be miss place element after and reinsert it is trivial */
+//         int hash = _set_##TK##_where(obj, obj->arr[it]);
+//         if (it != hash)
+//         {
+//             obj->arr[hash] = obj->arr[it];
+//             SET_NULL(obj->arr[it]);
+//         }
+//         it = (it + 1) % obj->capacity;
+//     }
+//     return true;
+// }
+void erase_untag(set_void_ptr *gc)
 {
-    TRY(ctx);
-    
-    da_qsort(&ctx->gc, void_ptr_cmp);
+    for (int i = 0; i < gc->capacity; i++)
+        if (gc->arr[i] && !is_gc_tag(gc->arr[i]))
+        {
+            free(gc->arr[i]);
+            gc->arr[i] = NULL;
+            gc->size--;
+            
+            i = (i + 1) % gc->capacity;
+            while (gc->arr[i])
+            {
+                if (!is_gc_tag(gc->arr[i]))
+                {
+                    free(gc->arr[i]);
+                    gc->arr[i] = NULL;
+                    i = (i + 1) % gc->capacity;
+                    gc->size--;
+                    continue;
+                }
+                //
+                int hash = _set_void_ptr_where(gc, gc->arr[i]);
+                if (i != hash)
+                {
+                    gc->arr[hash] = gc->arr[i];
+                    gc->arr[i] = NULL;
+                }
+                i = (i + 1) % gc->capacity;
+            }
+        }
+}
+// void set_void_ptr_filter(set_void_ptr *gc, bool (*filter)(void_ptr), void *ctx, bool (*callback)(void *ctx, void_ptr))
+// {
+//     for (int i = 0; i < gc->capacity; i++)
+//         if (IS_NULL(gc->arr[i]) && !filter(gc->arr[i]))
+//         {
+//             callback(ctx, gc->arr[i]);
+//             SET_NULL(gc->arr[i]);
+//             gc->size--;
+//             i = (i + 1) % gc->capacity;
+//             while (IS_NULL(gc->arr[i]))
+//             {
+//                 if (!filter(gc->arr[i]))
+//                 {
+//                     callback(ctx, gc->arr[i]);
+//                     SET_NULL(gc->arr[i]);
+//                     i = (i + 1) % gc->capacity;
+//                     gc->size--;
+//                     continue;
+//                 }
+//                 int hash = _set_void_ptr_where(gc, gc->arr[i]);
+//                 if (i != hash)
+//                 {
+//                     gc->arr[hash] = gc->arr[i];
+//                     SET_NULL(gc->arr[i]);
+//                 }
+//                 i = (i + 1) % gc->capacity;
+//             }
+//         }
+// }
 
-    da_unique(&ctx->gc);
 
+void gc_tag_context(Lisp_context *ctx)
+{
     // traverse code
     gc_traverse_mark(ctx, ctx->root);
 
@@ -120,23 +218,46 @@ bool garbage_collector(Lisp_context *ctx)
         gc_traverse_mark(ctx, it->name);
         gc_traverse_mark(ctx, it->value);
     }
+}
 
+bool garbage_collector(Lisp_context *ctx)
+{
+    TRY(ctx);
+    
+    
+    gc_tag_context(ctx);
+
+    size_t pointers_count = ctx->gc.size;
+    
+    erase_untag(&ctx->gc);
+
+    set_for (void_ptr, it, &ctx->gc)
+        *it = gc_untag(*it);
+    
+    // restart:
+    // set_for (void_ptr, it, &ctx->gc)
+    // {
+    //     if (!is_gc_tag(*it))
+    //     {
+    //         set_void_ptr_erase(&ctx->gc, *it);
+    //         goto restart;
+    //     }
+    // }
+    // da_qsort(&ctx->gc, void_ptr_cmp);
+    // da_unique(&ctx->gc);
     // // free untaged pointers
     // for (int i = 0; i < ctx->gc.size; i++)
     // {
     //     if (!is_gc_tag(ctx->gc.arr[i]))
     //         free(ctx->gc.arr[i]);
     // }
-
     // // delete untaged pointers
-    // int shift = da_filter(&ctx->gc, is_gc_tag);
-    
+    // int shift = da_filter(&ctx->gc, is_gc_tag);    
     // // untag remaining pointers
     // da_for (void*, it, &ctx->gc)
     //     *it = gc_untag(*it);
-
     // free and delete untaged pointers and unmark the remaining
-    int shift = 0;
+    /* int shift = 0;
     for (int i = 0; i+1 < ctx->gc.size; i++)
     {
         if (!is_gc_tag(ctx->gc.arr[i])) // && i + 1 != ctx->gc.size)
@@ -149,7 +270,6 @@ bool garbage_collector(Lisp_context *ctx)
         else
             ctx->gc.arr[i - shift] = gc_untag(ctx->gc.arr[i]);
     }
-
     if (ctx->gc.size > 0)
     {
         if (!is_gc_tag(da_top(&ctx->gc)))
@@ -157,11 +277,11 @@ bool garbage_collector(Lisp_context *ctx)
         ctx->gc.arr[ctx->gc.size - 1 - shift] = gc_untag(da_top(&ctx->gc));
     }
     ctx->gc.size -= shift;
-    
+ */
 
-    printf("gc stats: %d freed for %d chunks (%lf%%)\n", 
-        shift, (shift + ctx->gc.size), 
-        (double)shift / (shift + ctx->gc.size) * 100.0
+    printf("gc stats: %ld freed for %ld chunks (%lf%%)\n", 
+        pointers_count - ctx->gc.size, pointers_count, 
+        (1.0 - (double)ctx->gc.size / pointers_count) * 100.0
     );
 
     return true;

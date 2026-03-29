@@ -11,7 +11,7 @@
 #include <setjmp.h>
 
 #define AR_MAX_ALIGN 8
-#include "ar_virt.h"
+#include "ar.h"
 
 typedef enum List_tag : uint8_t
 {
@@ -62,7 +62,10 @@ typedef struct Variable
 } Variable;
 DA_TYPEDEF_ARRAY(Variable);
 
-SET_TYPEDEF_HASH_SET(Variable);
+
+typedef void *void_ptr;
+SET_TYPEDEF_HASH_SET(void_ptr); // gc
+SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
 
 
 DA_TYPEDEF_ARRAY_PTR(void);
@@ -79,7 +82,7 @@ typedef struct Lisp_context
 
     List root;
 
-    da_ptr_void gc;
+    set_void_ptr gc;
     // Strb error;
 } Lisp_context;
 
@@ -137,7 +140,5 @@ void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count);
 void *List_duplicate(Lisp_context *ctx, void *src, size_t count);
 bool garbage_collector(Lisp_context *ctx);
 
-
-#include "memory.h"
 
 #endif /* LISP_H */
