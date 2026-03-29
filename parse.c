@@ -183,10 +183,15 @@ bool list(Strv *str, List *li)
         char *end = &str->arr[str->size];
 
         *li = (List){
-            .tag = tag_number,
-            .number = strtod(str->arr, &it)
-            // .number = strtoll(str->arr, &it, 10)
+            .tag = tag_integer,
+            .integer = strtoll(str->arr, &it, 10)
         };
+        if (*it == '.')
+            *li = (List){
+                .tag = tag_real,
+                .real = strtod(str->arr, &it)
+            };
+        
         if (it != str->arr)
         {
             *str = Strv_range(it, end); 

@@ -23,16 +23,12 @@ bool _dump_indent(Strb *out, const List li, int indent)
         Strb_cat_nchar(out, indent, ' ');
         Strb_cat(out, ")");
     } break;
-    case tag_number: {
-        if (fmod(li.number, 1.0) == 0.0)
-            Strb_catf(out, "%.0f64", li.number);
-        else
-            Strb_catf(out, "%f64", li.number);
-    } break;
-    case tag_symbole:   Strb_catf(out, "%.*s", li.size, li.str); break;
-    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str); break;
-    case tag_true:      Strb_cat(out, "true");                   break;
-    default:            Strb_cat(out, "UNKOWN");                 break;
+    case tag_real:      Strb_catf(out, "%.0f64", li.real);         break;
+    case tag_integer:   Strb_catf(out, "%d64",   li.integer);      break;
+    case tag_symbole:   Strb_catf(out, "%.*s",   li.size, li.str); break;
+    case tag_string:    Strb_catf(out, "%.*s",   li.size, li.str); break;
+    case tag_true:      Strb_cat(out, "true");                     break;
+    default:            Strb_cat(out, "UNKOWN");                   break;
     }
     return true;
 }
@@ -61,18 +57,10 @@ bool _dump_type_indent(Strb *out, const List li, int indent)
         Strb_cat_nchar(out, indent, ' ');
         Strb_cat(out, ")");
     } break;
-    case tag_string: {
-        Strb_catf(out, "string: \"%.*s\"", li.size, li.str);
-    } break;
-    case tag_number: {
-        if (fmod(li.number, 1.0) == 0.0)
-            Strb_catf(out, "number: %.0f64", li.number);
-        else
-            Strb_catf(out, "number: %f64", li.number);
-    } break;
-    case tag_true: {
-        Strb_cat(out, "true");
-    } break;
+    case tag_string:    Strb_catf(out, "string: \"%.*s\"", li.size, li.str); break;
+    case tag_real:      Strb_catf(out, "real: %.0f64",   li.real);      break;
+    case tag_integer:   Strb_catf(out, "interger: %d64", li.integer);   break;
+    case tag_true:      Strb_cat(out, "true");                          break;
     default: Strb_cat(out, "UNKOWN"); break;
     }
     return true;
@@ -94,16 +82,12 @@ bool dump(Strb *out, const List li)
         }
         Strb_cat(out, ")");
     } break;
-    case tag_number: {
-        if (fmod(li.number, 1.0) == 0.0)
-            Strb_catf(out, "%.0f64", li.number);
-        else
-            Strb_catf(out, "%f64", li.number);
-    } break;
-    case tag_symbole:   Strb_catf(out, "%.*s", li.size, li.str);  break;
-    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str);  break;
-    case tag_true:      Strb_cat(out, "true");                    break;
-    default:            Strb_cat(out, "UNKOWN");                  break;
+    case tag_real:      Strb_catf(out, "%.0f64",   li.real);        break;
+    case tag_integer:   Strb_catf(out, "%d64", li.integer);         break;
+    case tag_symbole:   Strb_catf(out, "%.*s", li.size, li.str);    break;
+    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str);    break;;
+    case tag_true:      Strb_cat(out, "true");                      break;
+    default:            Strb_cat(out, "UNKOWN");                    break;
     }
     return true;
 }

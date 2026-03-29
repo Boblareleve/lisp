@@ -19,10 +19,8 @@ typedef enum List_tag : uint8_t
     tag_true,      // t
     tag_symbole,   // 
     tag_string,    // "dslmjkfdsqml"
-    tag_number,    // 4326324 3.3
-    // tag_slice,     
-    // tag_integer
-    // tag_...
+    tag_integer,   // 4326324
+    tag_real,      // 3.3
 } List_tag;
 
 
@@ -47,8 +45,8 @@ struct List
     union {
         List *list;
         char *str;
-        // int64_t number; // double ?
-        double number;
+        double real;
+        int64_t integer;
     };
 };
 static_assert(sizeof(List) == 16);
@@ -104,7 +102,8 @@ static inline const char *tag_to_string(int tag)
         [tag_true]      = "tag_true",
         [tag_symbole]   = "tag_symbole",
         [tag_string]    = "tag_string",
-        [tag_number]    = "tag_number",
+        [tag_integer]   = "tag_integer",
+        [tag_real]      = "tag_real",
         [tag_list]      = "tag_list",
     };
     return table[tag];

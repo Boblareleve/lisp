@@ -149,6 +149,231 @@ fail:
     return res;
 }
 
+
+static inline List add_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer + b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_integer,
+                .real = (double)a.integer + b.real
+            };
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_real,
+                .real = a.real + (double)b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = a.real + b.real
+            };
+    }
+    return NIL_LIST;
+}
+static inline List sub_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer - b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = (double)a.integer - b.real
+            };
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_real,
+                .real = a.real - (double)b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = a.real - b.real
+            };
+    }
+    return NIL_LIST;
+}
+static inline List mult_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer * b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = (double)a.integer * b.real
+            };
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_real,
+                .real = a.real * (double)b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = a.real * b.real
+            };
+    }
+    return NIL_LIST;
+}
+static inline List div_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer / b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = (double)a.integer / b.real
+            };
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_real,
+                .real = a.real / (double)b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_real,
+                .real = a.real / b.real
+            };
+    }
+    return NIL_LIST;
+}
+static inline List idiv_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer / b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_integer,
+                .integer = a.integer / (int64_t)b.real
+            };
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return (List){
+                .tag = tag_integer,
+                .integer = (int64_t)a.real / b.integer
+            };
+        else if (b.tag == tag_real)
+            return (List){
+                .tag = tag_integer,
+                .integer = (int64_t)a.real / (int64_t)b.real
+            };
+    }
+    return NIL_LIST;
+}
+static inline List le_than_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return a.integer <= b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.integer <= b.real ? TRUE_LIST : NIL_LIST;
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return a.real <= b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.real <= b.real ? TRUE_LIST : NIL_LIST;
+    }
+    return NIL_LIST;
+}
+static inline List ge_than_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return a.integer >= b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.integer >= b.real ? TRUE_LIST : NIL_LIST;
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return a.real >= b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.real >= b.real ? TRUE_LIST : NIL_LIST;
+    }
+    return NIL_LIST;
+}
+static inline List l_than_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return a.integer < b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.integer < b.real ? TRUE_LIST : NIL_LIST;
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return a.real < b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.real < b.real ? TRUE_LIST : NIL_LIST;       
+    }
+    return NIL_LIST;
+}
+static inline List g_than_List(List a, List b)
+{
+    if (a.tag == tag_integer)
+    {
+        if (b.tag == tag_integer)
+            return a.integer > b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.integer > b.real ? TRUE_LIST : NIL_LIST;
+    }
+    else if (a.tag == tag_real)
+    {
+        if (b.tag == tag_integer)
+            return a.real > b.integer ? TRUE_LIST : NIL_LIST;
+        else if (b.tag == tag_real)
+            return a.real > b.real ? TRUE_LIST : NIL_LIST;
+    }
+    return NIL_LIST;
+}
+
+
 bool eval(Lisp_context *ctx, const List li, List *out)
 {
     TRY(out, error_log("no output"));
@@ -167,7 +392,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     // self-evaluating
     case tag_string:
     case tag_true:
-    case tag_number: {
+    case tag_integer:
+    case tag_real: {
         *out = li;
     } return true;
 
@@ -250,22 +476,22 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             List index_l = {0};
             TRY(eval(ctx, li.list[2], &index_l));
-            TRY(index_l.tag == tag_number, error_log("expected an index %s", tag_to_string(index_l.tag)));
-            int i_index_l = index_l.number;
+            TRY(index_l.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_l.tag)));
+            int i_index_l = index_l.integer;
             TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
 
             List index_h = {0};
             if (li.size == 4)
             {
                 TRY(eval(ctx, li.list[3], &index_h));
-                TRY(index_h.tag == tag_number, error_log("expected an index %s", tag_to_string(index_h.tag)));
-                int i_index_h = index_h.number;
+                TRY(index_h.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_h.tag)));
+                int i_index_h = index_h.integer;
                 TRY(i_index_l < i_index_h && i_index_h <= list.size, error_log("out of bounds %d is not range of list of size %d", i_index_h, list.size));
                 *out = list;
                 out->size = i_index_h - i_index_l; // [] '(1 2 3) 1 2 -> .size = 1  
                 out->offset += i_index_l;          //                 -> offset+1
                 out->list   += i_index_l;          //                 -> ptr + 1
-                printf("->> [%d:%d] %d %d\n", i_index_l, i_index_h, out->size, out->offset);
+                // printf("->> [%d:%d] %d %d\n", i_index_l, i_index_h, out->size, out->offset);
                 return true;
             }
 
@@ -346,25 +572,21 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             if (li.size == 2)
                 TRY(eval(ctx, li.list[1], out));
             
-            // REFMAYBE
             ctx->in_return = true;
             return false;
         }
         if (List_equal_lit(op, "+"))
         {
             TRY(li.size >= 3, error_log("expected at least 3 elements for '+' got %d", li.size));
-            List res = {
-                .tag = tag_number,
-                .number = 0
-            };
-            for (int i = 1; i < li.size; i++)
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
+
+            for (int i = 2; i < li.size; i++)
             {
                 List operand = {0};
                 
                 TRY(eval(ctx, li.list[i], &operand));
-                TRY(operand.tag == tag_number, error_log("expected a number to add got %s", tag_to_string(operand.tag)));
-    
-                res.number += operand.number;
+                TRY((res = add_List(res, operand)).tag != tag_list);
             }
             *out = res;
             return true;
@@ -376,8 +598,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             Variable *to_inc = get_Variable(ctx, li.list[1]);
             TRY(to_inc, error_log("variable \"%.*s\" to increment not found", li.list[1].size, li.list[1].str));
-            TRY(to_inc->value.tag == tag_number, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
-            to_inc->value.number += 1;
+            TRY(to_inc->value.tag == tag_integer, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
+            to_inc->value.integer += 1;
             *out = to_inc->value;
             return true;
         }
@@ -388,8 +610,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             Variable *to_dec = get_Variable(ctx, li.list[1]);
             TRY(to_dec, error_log("variable \"%.*s\" to decrement not found", li.list[1].size, li.list[1].str));
-            TRY(to_dec->value.tag == tag_number, error_log("try to decrement %s", tag_to_string(to_dec->value.tag)));
-            to_dec->value.number -= 1;
+            TRY(to_dec->value.tag == tag_integer, error_log("try to decrement %s", tag_to_string(to_dec->value.tag)));
+            to_dec->value.integer -= 1;
             *out = to_dec->value;
             return true;
         }
@@ -398,16 +620,14 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size >= 3, error_log("expected at least 3 elements for '-' got %d", li.size));
             List res = {0};
             TRY(eval(ctx, li.list[1], &res));
-            TRY(res.tag == tag_number);
+            TRY(res.tag == tag_integer);
 
             for (int i = 2; i < li.size; i++)
             {
                 List operand = {0};
                 
                 TRY(eval(ctx, li.list[i], &operand));
-                TRY(operand.tag == tag_number, error_log("expected a number to subtruct got %s", tag_to_string(operand.tag)));
-                
-                res.number -= operand.number;
+                TRY((res = sub_List(res, operand)).tag != tag_list, error_log("expected a number to subtruct got %s", tag_to_string(operand.tag)));
             }
             *out = res;
             return true;
@@ -415,18 +635,14 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         if (List_equal_lit(op, "*"))
         {
             TRY(li.size >= 3, error_log("expected at least 2 elements for '*' got %d", li.size));
-            List res = { 
-                .tag = tag_number,
-                .number = 1
-            };
-            for (int i = 1; i < li.size; i++)
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
+
+            for (int i = 2; i < li.size; i++)
             {
                 List operand = {0};
-    
                 TRY(eval(ctx, li.list[i], &operand));
-                TRY(operand.tag == tag_number, error_log("expected a number to multiply got %s", tag_to_string(operand.tag)));
-                
-                res.number *= operand.number;
+                TRY((res = mult_List(res, operand)).tag != tag_list, error_log("expected a number to multiply got %s", tag_to_string(operand.tag)));
             }
             *out = res;
             return true;
@@ -436,16 +652,12 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size >= 3, error_log("expected at least 2 elements for '/' got %d", li.size));
             List res = {0};
             TRY(eval(ctx, li.list[1], &res));
-            TRY(res.tag == tag_number);
 
             for (int i = 2; i < li.size; i++)
             {
                 List operand = {0};
-                
                 TRY(eval(ctx, li.list[i], &operand));
-                TRY(operand.tag == tag_number, error_log("expected a number to divide got %s", tag_to_string(operand.tag)));
-                
-                res.number /= operand.number;
+                TRY((res = div_List(res, operand)).tag != tag_list, error_log("expected a number to divide got %s", tag_to_string(operand.tag)));
             }
             *out = res;
             return true;
@@ -455,17 +667,12 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size >= 3, error_log("expected at least 2 elements for '//' got %d", li.size));
             List res = {0};
             TRY(eval(ctx, li.list[1], &res));
-            TRY(res.tag == tag_number);
 
             for (int i = 2; i < li.size; i++)
             {
                 List operand = {0};
-                
                 TRY(eval(ctx, li.list[i], &operand));
-                TRY(operand.tag == tag_number, error_log("expected a number to divide integer got %s", tag_to_string(operand.tag)));
-                
-                res.number /= operand.number;
-                res.number = round(res.number);
+                TRY((res = idiv_List(res, operand)).tag != tag_list, error_log("expected a number to divide integer got %s", tag_to_string(operand.tag)));
             }
             *out = res;
             return true;
@@ -491,32 +698,62 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         }
         if (List_equal_lit(op, "<="))
         {
-            TRY(li.size == 3, error_log("expected 2 elements for '<=' got %d", li.size));
-            
-            List left = {0};
-            TRY(eval(ctx, li.list[1], &left));
-            TRY(left.tag == tag_number);
-            List right = {0};
-            TRY(eval(ctx, li.list[2], &right));
-            TRY(right.tag == tag_number);
+            TRY(li.size >= 3, error_log("expected at least 2 elements for '<=' got %d", li.size));
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
 
-            if (left.number <= right.number)
-                *out = TRUE_LIST;
+            for (int i = 2; i < li.size; i++)
+            {
+                List operand = {0};
+                TRY(eval(ctx, li.list[i], &operand));
+                TRY((res = le_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
+            }
+            *out = res;
             return true;
         }
         if (List_equal_lit(op, ">="))
         {
-            TRY(li.size == 3, error_log("expected 2 elements for '>=' got %d", li.size));
-            
-            List left = {0};
-            TRY(eval(ctx, li.list[1], &left));
-            TRY(left.tag == tag_number);
-            List right = {0};
-            TRY(eval(ctx, li.list[2], &right));
-            TRY(right.tag == tag_number);
+            TRY(li.size >= 3, error_log("expected at least 2 elements for '>=' got %d", li.size));
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
 
-            if (left.number >= right.number)
-                *out = TRUE_LIST;
+            for (int i = 2; i < li.size; i++)
+            {
+                List operand = {0};
+                TRY(eval(ctx, li.list[i], &operand));
+                TRY((res = ge_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
+            }
+            *out = res;
+            return true;
+        }
+        if (List_equal_lit(op, ">"))
+        {
+            TRY(li.size >= 3, error_log("expected at least 2 elements for '>' got %d", li.size));
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
+
+            for (int i = 2; i < li.size; i++)
+            {
+                List operand = {0};
+                TRY(eval(ctx, li.list[i], &operand));
+                TRY((res = g_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
+            }
+            *out = res;
+            return true;
+        }
+        if (List_equal_lit(op, "<"))
+        {
+            TRY(li.size >= 3, error_log("expected at least 2 elements for '<' got %d", li.size));
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
+
+            for (int i = 2; i < li.size; i++)
+            {
+                List operand = {0};
+                TRY(eval(ctx, li.list[i], &operand));
+                TRY((res = l_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
+            }
+            *out = res;
             return true;
         }
         if (List_equal_lit(op, "!="))
@@ -584,7 +821,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 2);
             TRY(eval(ctx, li.list[1], out),  *out = NIL_LIST);
             TRY(out->tag == tag_list,        *out = NIL_LIST);
-            TRY(out->size > 0,              *out = NIL_LIST; error_log("can't take first element of an empty list"));
+            TRY(out->size > 0,               *out = NIL_LIST; error_log("can't take first element of an empty list"));
             
             *out = out->list[0];
             return true;
@@ -671,7 +908,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
             List res = {0};
             TRY(eval(ctx, li.list[1], &res));
-            TRY(res.tag == tag_number);
+            TRY(res.tag == );
 
             for (int i = 2; i < li.size; i++)
             {
@@ -711,7 +948,8 @@ bool List_equal(const List li1, const List li2)
     
     switch (li1.tag)
     {
-    case tag_number: return fabs(li1.number - li2.number) < 1.0E-10;
+    case tag_integer: return li1.integer == li2.integer;
+    case tag_real:    return fabs(li1.real - li2.real) < 1.0E-10;
     case tag_list: {
         TRY(li1.size == li2.size);
         for (int i = 0; i < li1.size; i++)
