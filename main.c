@@ -54,7 +54,6 @@ fail:
 }
 
 
-
 bool test(const Strv str)
 {
     if (str.size == 0)

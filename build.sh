@@ -9,15 +9,15 @@ SRC='main.c lisp.c dump.c parse.c memory.c'
 case $1 in
     release)
         OUT=lisp_r
-        gcc -DNDEBUG $SRC -o $OUT -I$MY_LIB -lm $WFLAGS
+        gcc  $SRC -o $OUT -I$MY_LIB -lm $WFLAGS -DNDEBUG -O1 
     ;;
     debug)
         OUT=lisp_d
-        gcc -DDEBUG $SRC  -o $OUT -I$MY_LIB -lm -ggdb $WFLAGS
+        gcc  $SRC  -o $OUT -I$MY_LIB -lm $WFLAGS -DDEBUG -ggdb  
     ;;
     sanitized)
         OUT=lisp_s
-        gcc -DDEBUG $SRC  -o $OUT -I$MY_LIB -g3 -lm -fsanitize=address,undefined $WFLAGS
+        gcc  $SRC  -o $OUT -I$MY_LIB -g3 $WFLAGS -DDEBUG -lm -fsanitize=address,undefined 
     ;;
     _)
     ;;

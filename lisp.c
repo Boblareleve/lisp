@@ -489,6 +489,36 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = TRUE_LIST;
             return true;
         }
+        if (List_equal_lit(op, "<="))
+        {
+            TRY(li.size == 3, error_log("expected 2 elements for '<=' got %d", li.size));
+            
+            List left = {0};
+            TRY(eval(ctx, li.list[1], &left));
+            TRY(left.tag == tag_number);
+            List right = {0};
+            TRY(eval(ctx, li.list[2], &right));
+            TRY(right.tag == tag_number);
+
+            if (left.number <= right.number)
+                *out = TRUE_LIST;
+            return true;
+        }
+        if (List_equal_lit(op, ">="))
+        {
+            TRY(li.size == 3, error_log("expected 2 elements for '>=' got %d", li.size));
+            
+            List left = {0};
+            TRY(eval(ctx, li.list[1], &left));
+            TRY(left.tag == tag_number);
+            List right = {0};
+            TRY(eval(ctx, li.list[2], &right));
+            TRY(right.tag == tag_number);
+
+            if (left.number >= right.number)
+                *out = TRUE_LIST;
+            return true;
+        }
         if (List_equal_lit(op, "!="))
         {
             TRY(li.size >= 3, error_log("expected at least 2 elements for '!=' got %d", li.size));
@@ -636,7 +666,19 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = li.list[1];
             return true;
         }
-        
+        /* if (List_equal_lit(op, "$"))
+        {
+            TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
+            List res = {0};
+            TRY(eval(ctx, li.list[1], &res));
+            TRY(res.tag == tag_number);
+
+            for (int i = 2; i < li.size; i++)
+            {
+            }
+            *out = res;
+            return true;
+        } */
 
         { // variable or function
             Variable *var_fun;
