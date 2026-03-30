@@ -3,7 +3,6 @@
 
 FILE *fd = NULL;
 
-// DA_TYPEDEF_ARRAY(List);
 bool test_eval(List root)
 {
     Lisp_context ctx = Lisp_context_init(root);
@@ -95,14 +94,13 @@ int main(int argc, char **argv)
     }
     Strb_free(error);
 
-    // bool a();
-    // a();
+    
     return 0;
 }
 
 
 
-#include <dlfcn.h>
+/* #include <dlfcn.h>
 
 bool a()
 {
@@ -131,4 +129,4 @@ bool a()
     fprintf(fd, "%.*s\n", error.size, error.arr);
     error.size = 0;
     return true;
-}
+} */

@@ -21,65 +21,43 @@ typedef enum List_tag : uint8_t
     tag_string,    // "dslmjkfdsqml"
     tag_integer,   // 4326324
     tag_real,      // 3.3
+    tag_type,      // int...
+    ttag_any_type, // can only be use in type_tag fild of List 
     tag_void_ptr,  // C struct handel
     tag_dynamic_lib,
     tag_foreign_function,
 } List_tag;
 
-typedef enum List_tag : uint8_t
-{
-    ty_list = 0,  // (a a a)|()
-    ty_true,      // t
-    ty_symbole,   // 
-    ty_string,    // "dslmjkfdsqml"
-    ty_integer,   // 4326324
-    ty_real,      // 3.3
-    ty_void_ptr,  // C struct handel
-    ty_dynamic_lib,
-    ty_foreign_function,
-} List_tag;
 
 
 #define NIL_LIST (List){0}
 #define TRUE_LIST (List){ .tag = tag_true }
 #define IS_NIL(li) ((li).tag == tag_list && (li).size == 0)
+#define ANY_TYPE ((List){ .tag = tag_type, .type_tag = ttag_any_type })
+#define TYPE_TYPE ((List){ .tag = tag_type, .type_tag = tag_type })
 
+#define TYPE_UNDEFINED_LIST_SIZE UINT16_MAX
 
 
 typedef struct List List;
-typedef void *(*f_dumb32_t)();
-typedef void *(*f_dumb16_t)();
-typedef void *(*f_dumb24_t)();
-typedef void *(*f_dumb8_t)();
-typedef void *(*f_dumb4_t)();
-typedef void *(*f_dumb2_t)();
-typedef void *(*f_dumb1_t)();
+
 
 // maybe get down to 8 bytes using uint32_t for indexing into a pool
 struct List
 {
     List_tag tag;
     uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
-    
+    List_tag type_tag;   // for type only
+
     uint16_t offset; // only to get back the start of the allocated chunk
     uint16_t size;
 
-    
     union {
         List *list;
         char *str;
         double real;
         int64_t integer;
         void *ptr;
-        union {
-            f_dumb32_t _32;
-            f_dumb16_t _16;
-            f_dumb24_t _24;
-            f_dumb8_t  _8;
-            f_dumb4_t  _4;
-            f_dumb2_t  _2;
-            f_dumb1_t  _1;
-        } fun;
     };
 };
 static_assert(sizeof(List) == 16);
@@ -88,24 +66,25 @@ static_assert(sizeof(List) == 16);
 
 typedef struct Variable
 {
-    List value;
     List name;
+    List type;
+    List value;
 } Variable;
 DA_TYPEDEF_ARRAY(Variable);
+DA_TYPEDEF_ARRAY(da_Variable);
+SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
 
 
 typedef void *void_ptr;
 SET_TYPEDEF_HASH_SET(void_ptr); // gc
-SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
 
-
-DA_TYPEDEF_ARRAY_PTR(void);
-DA_TYPEDEF_ARRAY(da_Variable);
+// DA_TYPEDEF_ARRAY_PTR(void);
 typedef struct Lisp_context
 {
     // globals
     set_Variable variables; 
     set_Variable functions;
+    set_Variable types;
 
     // stack (local)
     da_da_Variable args_stack;
@@ -141,6 +120,7 @@ static inline const char *tag_to_string(int tag)
         [tag_dynamic_lib]      = "tag_dynamic_lib",
         [tag_void_ptr]         = "tag_void_ptr",
         [tag_foreign_function] = "tag_foreign_function",
+        [tag_type]             = "tag_type",
     };
     return table[tag];
 }
@@ -179,11 +159,16 @@ void Lisp_context_free(Lisp_context *ctx);
 // memory.c
 void *List_alloc(Lisp_context *ctx, size_t count);
 void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count);
-void *List_duplicate(Lisp_context *ctx, void *src, size_t count);
+void *List_duplicate(Lisp_context *ctx, const void *src, size_t count);
 bool garbage_collector(Lisp_context *ctx);
 
 // dl.c
 List load_dl(const List path);
 bool unload_dl(const List dl);
 List get_fun_dl(List lib, const List name, const List desc);
+
+// type.c
+bool is_of_type(const List li, const List type);
+void add_simple_type(Lisp_context *ctx, const char *name, List type);
+
 #endif /* LISP_H */

@@ -52,11 +52,16 @@ Variable *get_Variable(Lisp_context *ctx, List name)
     return get_global_Variable(ctx, name);
 }
 
+Variable *get_type(Lisp_context *ctx, List name)
+{
+    return set_Variable_get(&ctx->types, (Variable){ .name = name });
+}
+
 // return index in the call stack
 size_t local_Variable(Lisp_context *ctx, Variable var)
 {
     da_Variable *frame = &da_top(&ctx->args_stack);
-if (ctx->args_stack.size > 0)
+    if (ctx->args_stack.size > 0)
         da_for (Variable, it, frame)
             if (List_str_equal(it->name, var.name))
             {
@@ -84,14 +89,16 @@ bool mutate_Variable(Lisp_context *ctx, Variable var)
         da_for (Variable, it, &da_top(&ctx->args_stack))
             if (List_str_equal(it->name, var.name))
             {
-                *it = var;
+                TRY(is_of_type(var.value, it->type), error_log("mutate value in stack to a value of an unexpected type"));
+                it->value = var.value;
                 return true;
             }
     
     Variable *old = set_Variable_emplace(&ctx->variables, var);
     if (!VAR_IS_NULL(*old))
     {
-        *old = var;
+        TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
+        old->value = var.value;
         return true;
     }
 
@@ -116,11 +123,27 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     
     { // push args with their names in stack
         da_Variable new_frame = {0};
+        
         for (int i = 0; i < args_def.size; i++)
         {
-            // TODO set_local_Variable ?
-            da_push(&new_frame, (Variable){ .name = args_def.list[i] });
-            GOTRY(eval(ctx, li.list[i+1], &da_top(&new_frame).value));
+            if (args_def.list[i].tag == tag_type)
+            {
+                TRY(i > 0, error_log("type decoration goes after a symbole"));
+                da_top(&new_frame).type = args_def.list[i];
+                TRY(is_of_type(da_top(&new_frame).value, da_top(&new_frame).type));
+                continue;
+            }
+            TRY(args_def.list[i].tag == tag_symbole);
+            Variable *type = get_type(ctx, args_def.list[i]);
+            if (type)
+            {
+                TRY(i > 0, error_log("type decoration goes after a symbole"));
+                da_top(&new_frame).type = type->value;
+                TRY(is_of_type(da_top(&new_frame).value, da_top(&new_frame).type));
+                continue;
+            }
+            da_push(&new_frame, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
+            TRY(eval(ctx, li.list[i+1], &da_top(&new_frame).value));
         }
         da_push(&ctx->args_stack, new_frame);
     }
@@ -138,7 +161,6 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     // return the last one
     GOTRY(eval(ctx, func_def.list[func_def.size-1], out));
     
-
 end:
     res = true;
 fail:
@@ -146,6 +168,7 @@ fail:
     TRY(ctx->args_stack.size > 0, error_log("return from root"));
     da_free(&da_top(&ctx->args_stack));
     ctx->args_stack.size--;
+    
     return res;
 }
 
@@ -399,6 +422,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
     switch (li.tag)
     {
     // self-evaluating
+    case tag_type:
     case tag_string:
     case tag_true:
     case tag_integer:
@@ -412,6 +436,13 @@ bool eval(Lisp_context *ctx, const List li, List *out)
         if (var)
         {
             *out = var->value;
+            return true;
+        }
+
+        Variable *type = get_type(ctx, li);
+        if (type)
+        {
+            *out = type->value;
             return true;
         }
 
@@ -444,8 +475,27 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 3, error_log("expected 3 element list for local got %d", li.size));
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
 
-            Variable var = { .name = li.list[1] };
+            Variable var = { .name = li.list[1], .type = ANY_TYPE };
             TRY(eval(ctx, li.list[2], &var.value));
+
+            local_Variable(ctx, var);
+
+            return true;
+        }
+        if (List_equal_lit(op, "tlocal")) // create and initilize a local variable
+        {
+            TRY(li.size == 4, error_log("expected 4 element list for tlocal (type local) got %d", li.size));
+
+            const List name = li.list[1];
+            TRY(name.tag == tag_symbole, error_log("expected a symbole in tlocal to got %s", tag_to_string(li.list[1].tag)));
+            
+            List type = {0};
+            TRY(eval(ctx, li.list[2], &type));
+            TRY(type.tag == tag_type, error_log("expected a type in tlocal got %s", tag_to_string(type.tag)));
+
+            Variable var = { .name = name, .type = type };
+            TRY(eval(ctx, li.list[3], &var.value));
+            TRY(is_of_type(var.value, var.type), error_log("set value in tlocal is not in the expected type"));
 
             local_Variable(ctx, var);
 
@@ -456,7 +506,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 3, error_log("expected 3 element list for local got %d", li.size));
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
 
-            Variable var = { .name = li.list[1] };
+            Variable var = { .name = li.list[1], .type = ANY_TYPE };
             TRY(eval(ctx, li.list[2], &var.value));
 
             global_Variable(ctx, var);
@@ -468,7 +518,7 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             TRY(li.size == 3, error_log("expected 3 element list for set got %d", li.size));
             TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(li.list[1].tag)));
 
-            Variable var = { .name = li.list[1] };
+            Variable var = { .name = li.list[1], .type = ANY_TYPE };
             TRY(eval(ctx, li.list[2], &var.value));
             
             TRY(mutate_Variable(ctx, var));
@@ -866,8 +916,8 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             List iterable = {0};
             TRY(eval(ctx, li.list[2], &iterable));
             TRY(iterable.tag == tag_list);
-
-            size_t it_idx = local_Variable(ctx, (Variable){ .name = li.list[1] }); 
+            // TYPED optionnal
+            size_t it_idx = local_Variable(ctx, (Variable){ .name = li.list[1], .type = ANY_TYPE }); 
             size_t frame_idx = ctx->args_stack.size - 1;
             for (int i = 0; i < iterable.size; i++)
             {
@@ -1057,6 +1107,14 @@ Lisp_context Lisp_context_init(List root)
     };
     da_push_zero(&res.args_stack);
 
+    // buildin types
+    add_simple_type(&res, "list",    (List){ .tag = tag_type, .type_tag = tag_list, .size = TYPE_UNDEFINED_LIST_SIZE, });
+    add_simple_type(&res, "symbole", (List){ .tag = tag_type, .type_tag = tag_symbole   });
+    add_simple_type(&res, "int",     (List){ .tag = tag_type, .type_tag = tag_integer   });
+    add_simple_type(&res, "float",   (List){ .tag = tag_type, .type_tag = tag_real      });
+    add_simple_type(&res, "string",  (List){ .tag = tag_type, .type_tag = tag_string    });
+    add_simple_type(&res, "type",    (List){ .tag = tag_type, .type_tag = tag_type      });
+    add_simple_type(&res, "any",     (List){ .tag = tag_type, .type_tag = ttag_any_type });
 
     return res;
 }
@@ -1072,6 +1130,7 @@ void Lisp_context_free(Lisp_context *ctx)
     
         set_Variable_free(&ctx->functions);
         set_Variable_free(&ctx->variables);
+        set_Variable_free(&ctx->types);
         ctx->root = NIL_LIST;
     }
 

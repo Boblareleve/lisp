@@ -50,7 +50,7 @@ void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count)
     return ptr;
 }
 
-void *List_duplicate(Lisp_context *ctx, void *src, size_t count)
+void *List_duplicate(Lisp_context *ctx, const void *src, size_t count)
 {
     void *new = List_alloc(ctx, count);
     return memcpy(new, src, count);
@@ -235,7 +235,7 @@ bool garbage_collector(Lisp_context *ctx)
         *it = gc_untag(*it);
 
 #ifdef GC_REPORT
-    printf("gc stats: %ld freed for %ld chunks (%lf%%) ", 
+    printf("gc stats: %ld freed for %ld chunks (%.2lf%%) ", 
         pointers_count - ctx->gc.size, pointers_count, 
         (1.0 - (double)ctx->gc.size / pointers_count) * 100.0
     );
