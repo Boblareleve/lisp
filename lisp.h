@@ -21,6 +21,22 @@ typedef enum List_tag : uint8_t
     tag_string,    // "dslmjkfdsqml"
     tag_integer,   // 4326324
     tag_real,      // 3.3
+    tag_void_ptr,  // C struct handel
+    tag_dynamic_lib,
+    tag_foreign_function,
+} List_tag;
+
+typedef enum List_tag : uint8_t
+{
+    ty_list = 0,  // (a a a)|()
+    ty_true,      // t
+    ty_symbole,   // 
+    ty_string,    // "dslmjkfdsqml"
+    ty_integer,   // 4326324
+    ty_real,      // 3.3
+    ty_void_ptr,  // C struct handel
+    ty_dynamic_lib,
+    ty_foreign_function,
 } List_tag;
 
 
@@ -31,6 +47,13 @@ typedef enum List_tag : uint8_t
 
 
 typedef struct List List;
+typedef void *(*f_dumb32_t)();
+typedef void *(*f_dumb16_t)();
+typedef void *(*f_dumb24_t)();
+typedef void *(*f_dumb8_t)();
+typedef void *(*f_dumb4_t)();
+typedef void *(*f_dumb2_t)();
+typedef void *(*f_dumb1_t)();
 
 // maybe get down to 8 bytes using uint32_t for indexing into a pool
 struct List
@@ -47,6 +70,16 @@ struct List
         char *str;
         double real;
         int64_t integer;
+        void *ptr;
+        union {
+            f_dumb32_t _32;
+            f_dumb16_t _16;
+            f_dumb24_t _24;
+            f_dumb8_t  _8;
+            f_dumb4_t  _4;
+            f_dumb2_t  _2;
+            f_dumb1_t  _1;
+        } fun;
     };
 };
 static_assert(sizeof(List) == 16);
@@ -97,14 +130,17 @@ do {\
 #define reset_error() (error.size)
 
 static inline const char *tag_to_string(int tag)
-{
+{  
     static const char *table[] = {
-        [tag_true]      = "tag_true",
-        [tag_symbole]   = "tag_symbole",
-        [tag_string]    = "tag_string",
-        [tag_integer]   = "tag_integer",
-        [tag_real]      = "tag_real",
-        [tag_list]      = "tag_list",
+        [tag_true]             = "tag_true",
+        [tag_symbole]          = "tag_symbole",
+        [tag_string]           = "tag_string",
+        [tag_integer]          = "tag_integer",
+        [tag_real]             = "tag_real",
+        [tag_list]             = "tag_list",
+        [tag_dynamic_lib]      = "tag_dynamic_lib",
+        [tag_void_ptr]         = "tag_void_ptr",
+        [tag_foreign_function] = "tag_foreign_function",
     };
     return table[tag];
 }
@@ -119,14 +155,20 @@ static inline void *List_get_ptr(const List *li)
 }
 
 #define List_to_Strv(li) (assert((li).tag == tag_string || (li).tag == tag_symbole), (Strv){ .arr = (li).str, .size = (li).size })
+#define _cstr_to_List(cstr) (List){ .tag = tag_string, .size = STRING_LEN(cstr), .str = cstr }
 #define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))
 #define List_equal_lit(li, lit) Strv_equal_lit(List_to_Strv(li), lit)
 
 
+// parse.c
 bool list(Strv *str, List *li);
 bool lists(Strv str, List *li);
+
+// dump.c
 bool dump(Strb *out, const List li);
 bool List_print(const List li);
+
+// lisp.c
 bool eval(Lisp_context *ctx, const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
@@ -134,10 +176,14 @@ List List_copy(Lisp_context *ctx, const List li);
 Lisp_context Lisp_context_init(List root);
 void Lisp_context_free(Lisp_context *ctx);
 
+// memory.c
 void *List_alloc(Lisp_context *ctx, size_t count);
 void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count);
 void *List_duplicate(Lisp_context *ctx, void *src, size_t count);
 bool garbage_collector(Lisp_context *ctx);
 
-
+// dl.c
+List load_dl(const List path);
+bool unload_dl(const List dl);
+List get_fun_dl(List lib, const List name, const List desc);
 #endif /* LISP_H */

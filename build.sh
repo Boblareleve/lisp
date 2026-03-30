@@ -3,7 +3,7 @@
 WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wno-address'
 
 OUT=lisp_d
-SRC='main.c lisp.c dump.c parse.c memory.c'
+SRC='main.c lisp.c dump.c parse.c memory.c dl.c'
 
 
 case $1 in

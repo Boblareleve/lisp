@@ -28,6 +28,9 @@ bool _dump_indent(Strb *out, const List li, int indent)
     case tag_symbole:   Strb_catf(out, "%.*s",   li.size, li.str); break;
     case tag_string:    Strb_catf(out, "\"%.*s\"",   li.size, li.str); break;
     case tag_true:      Strb_cat(out, "true");                     break;
+    case tag_dynamic_lib:
+    case tag_void_ptr:
+                        Strb_cat(out, li.ptr ? "<HANDLE>" : "(nil)"); break;
     default:            Strb_cat(out, "UNKOWN");                   break;
     }
     return true;
@@ -61,6 +64,9 @@ bool _dump_type_indent(Strb *out, const List li, int indent)
     case tag_real:      Strb_catf(out, "real: %.0f64",   li.real);      break;
     case tag_integer:   Strb_catf(out, "interger: %d64", li.integer);   break;
     case tag_true:      Strb_cat(out, "true");                          break;
+    case tag_dynamic_lib:
+    case tag_void_ptr:
+                        Strb_cat(out, li.ptr ? "<HANDLE>" : "handle: (nil)"); break;
     default: Strb_cat(out, "UNKOWN"); break;
     }
     return true;
@@ -82,12 +88,15 @@ bool dump(Strb *out, const List li)
         }
         Strb_cat(out, ")");
     } break;
-    case tag_real:      Strb_catf(out, "%.0f64",   li.real);        break;
-    case tag_integer:   Strb_catf(out, "%d64", li.integer);         break;
-    case tag_symbole:   Strb_catf(out, "%.*s", li.size, li.str);    break;
-    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str);    break;
-    case tag_true:      Strb_cat(out, "true");                      break;
-    default:            Strb_cat(out, "UNKOWN");                    break;
+    case tag_real:        Strb_catf(out, "%.0f64",   li.real);          break;
+    case tag_integer:     Strb_catf(out, "%d64", li.integer);           break;
+    case tag_symbole:     Strb_catf(out, "%.*s", li.size, li.str);      break;
+    case tag_string:      Strb_catf(out, "%.*s", li.size, li.str);      break;
+    case tag_true:        Strb_cat(out, "true");                        break;
+    case tag_dynamic_lib: 
+    case tag_void_ptr:
+                          Strb_cat(out, li.ptr ? "<HANDLE>" : "(nil)"); break;
+    default:              Strb_cat(out, "UNKOWN");                      break;
     }
     return true;
 }

@@ -91,11 +91,44 @@ int main(int argc, char **argv)
         else
             fprintf(fd, "\tSUCCESS\n");
         
-
         Strb_free(raw);
     }
     Strb_free(error);
 
-
+    // bool a();
+    // a();
     return 0;
+}
+
+
+
+#include <dlfcn.h>
+
+bool a()
+{
+    List dl_sqlite3 = load_dl(_cstr_to_List("libsqlite3.so.0"));
+    if (IS_NIL(dl_sqlite3))
+    {
+        fprintf(fd, "%.*s\n", error.size, error.arr);
+        error.size = 0;
+        return false;
+    }
+
+    List_print(dl_sqlite3);
+    printf("\n");
+    
+    
+    List sqlv = get_fun_dl(dl_sqlite3, _cstr_to_List("sqlite3_libversion"), NIL_LIST);
+    if (IS_NIL(sqlv))
+    {
+        fprintf(fd, "%.*s\n", error.size, error.arr);
+        return false;
+    }
+    assert(sqlv.fun._1);
+    printf("sqlite3 version: %s\n", (char*)sqlv.fun._8());
+    
+    unload_dl(dl_sqlite3);
+    fprintf(fd, "%.*s\n", error.size, error.arr);
+    error.size = 0;
+    return true;
 }
