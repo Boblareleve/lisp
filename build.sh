@@ -17,7 +17,7 @@ case $1 in
     ;;
     sanitized)
         OUT=lisp_s
-        gcc  $SRC  -o $OUT -I$MY_LIB -g3 $WFLAGS -DDEBUG -lm -fsanitize=address,undefined 
+        gcc  $SRC  -o $OUT -I$MY_LIB -g3 $WFLAGS -DDEBUG -DGC_REPORT -lm -fsanitize=address,undefined 
     ;;
     _)
     ;;

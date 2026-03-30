@@ -372,6 +372,15 @@ static inline List g_than_List(List a, List b)
     }
     return NIL_LIST;
 }
+static inline List typeof_List(Lisp_context *ctx, List li)
+{
+    Strv sv = Strv_stride(Strv_ccstr((char*)tag_to_string(li.tag)), 4);
+    return (List){
+        .tag = tag_string,
+        .str = List_duplicate(ctx, sv.arr, sv.size),
+        .size = sv.size
+    };
+}
 
 
 bool eval(Lisp_context *ctx, const List li, List *out)
@@ -903,6 +912,27 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = li.list[1];
             return true;
         }
+        if (List_equal_lit(op, "typeof"))
+        {
+            TRY(li.size == 2);
+            TRY(eval(ctx, li.list[1], out));
+            *out = typeof_List(ctx, *out);
+            return true;
+        }
+        if (List_equal_lit(op, "eval"))
+        {
+            TRY(li.size >= 2);
+            *out = (List){
+                .tag = tag_list,
+                .size = li.size-1,
+                .list = List_alloc(ctx, sizeof(List) * (li.size - 1))
+            };
+            for (int i = 1; i < li.size; i++)
+                TRY(eval(ctx, li.list[i], &out->list[i-1]));
+            
+            return true;
+        }
+        
         /* if (List_equal_lit(op, "$"))
         {
             TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));

@@ -233,56 +233,15 @@ bool garbage_collector(Lisp_context *ctx)
 
     set_for (void_ptr, it, &ctx->gc)
         *it = gc_untag(*it);
-    
-    // restart:
-    // set_for (void_ptr, it, &ctx->gc)
-    // {
-    //     if (!is_gc_tag(*it))
-    //     {
-    //         set_void_ptr_erase(&ctx->gc, *it);
-    //         goto restart;
-    //     }
-    // }
-    // da_qsort(&ctx->gc, void_ptr_cmp);
-    // da_unique(&ctx->gc);
-    // // free untaged pointers
-    // for (int i = 0; i < ctx->gc.size; i++)
-    // {
-    //     if (!is_gc_tag(ctx->gc.arr[i]))
-    //         free(ctx->gc.arr[i]);
-    // }
-    // // delete untaged pointers
-    // int shift = da_filter(&ctx->gc, is_gc_tag);    
-    // // untag remaining pointers
-    // da_for (void*, it, &ctx->gc)
-    //     *it = gc_untag(*it);
-    // free and delete untaged pointers and unmark the remaining
-    /* int shift = 0;
-    for (int i = 0; i+1 < ctx->gc.size; i++)
-    {
-        if (!is_gc_tag(ctx->gc.arr[i])) // && i + 1 != ctx->gc.size)
-        {
-            // printf("i: %d\n", i);
-            // printf("-wow> %.*s\n", 3, (char*)ctx->gc.arr[i]);
-            free(ctx->gc.arr[i]);
-            shift++;
-        }
-        else
-            ctx->gc.arr[i - shift] = gc_untag(ctx->gc.arr[i]);
-    }
-    if (ctx->gc.size > 0)
-    {
-        if (!is_gc_tag(da_top(&ctx->gc)))
-            shift++;
-        ctx->gc.arr[ctx->gc.size - 1 - shift] = gc_untag(da_top(&ctx->gc));
-    }
-    ctx->gc.size -= shift;
- */
 
-    printf("gc stats: %ld freed for %ld chunks (%lf%%)\n", 
+#ifdef GC_REPORT
+    printf("gc stats: %ld freed for %ld chunks (%lf%%) ", 
         pointers_count - ctx->gc.size, pointers_count, 
         (1.0 - (double)ctx->gc.size / pointers_count) * 100.0
     );
+#else
+    (void)pointers_count;
+#endif
 
     return true;
 }

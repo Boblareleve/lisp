@@ -21,12 +21,12 @@ bool _dump_indent(Strb *out, const List li, int indent)
             Strb_cat(out, "\n");
         }
         Strb_cat_nchar(out, indent, ' ');
-        Strb_cat(out, ")");
+        Strb_cat(out, ")\n");
     } break;
     case tag_real:      Strb_catf(out, "%.0f64", li.real);         break;
     case tag_integer:   Strb_catf(out, "%d64",   li.integer);      break;
     case tag_symbole:   Strb_catf(out, "%.*s",   li.size, li.str); break;
-    case tag_string:    Strb_catf(out, "%.*s",   li.size, li.str); break;
+    case tag_string:    Strb_catf(out, "\"%.*s\"",   li.size, li.str); break;
     case tag_true:      Strb_cat(out, "true");                     break;
     default:            Strb_cat(out, "UNKOWN");                   break;
     }
@@ -85,7 +85,7 @@ bool dump(Strb *out, const List li)
     case tag_real:      Strb_catf(out, "%.0f64",   li.real);        break;
     case tag_integer:   Strb_catf(out, "%d64", li.integer);         break;
     case tag_symbole:   Strb_catf(out, "%.*s", li.size, li.str);    break;
-    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str);    break;;
+    case tag_string:    Strb_catf(out, "%.*s", li.size, li.str);    break;
     case tag_true:      Strb_cat(out, "true");                      break;
     default:            Strb_cat(out, "UNKOWN");                    break;
     }
