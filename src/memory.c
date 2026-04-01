@@ -218,11 +218,11 @@ void gc_tag_context(Lisp_context *ctx)
     }
 
     // traverse functions
-    set_for (Variable, it, &ctx->functions)
-    {
-        gc_traverse_mark(ctx, it->name);
-        gc_traverse_mark(ctx, it->value);
-    }
+    // set_for (Variable, it, &ctx->functions)
+    // {
+    //     gc_traverse_mark(ctx, it->name);
+    //     gc_traverse_mark(ctx, it->value);
+    // }
 }
 
 bool garbage_collector(Lisp_context *ctx)

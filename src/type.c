@@ -10,6 +10,17 @@
 //         )
 // }
 
+bool have_function_shape(const List li)
+{
+    TRY(li.tag == tag_list);
+    TRY(li.size >= 2);
+    TRY(li.list[0].tag == tag_list);
+    for (int i = 0; i < li.list[0].size; i++)
+        TRY(li.list[0].list[i].tag == tag_symbole // symbole that will be link to a type or a is a local variable
+         || li.list[0].list[i].tag == tag_type);  // or a type
+    return true;
+}
+
 bool is_of_type(const List li, const List type)
 {
     assert(type.tag == tag_type);
@@ -64,23 +75,16 @@ bool type_compatible(const List a, const List b)
     }
     return true;
 }
-
-
-// void add_simple_type(Lisp_context *ctx, const char *name, List_tag tag)
-// {
-//     set_Variable_insert(&ctx->types, (Variable){
-//         _cstr_to_List(name),
-//         (List){
-//             .tag = tag_type,
-//             .type_tag = tag
-//         }
-//     });
-// }
+    
 void add_simple_type(Lisp_context *ctx, const char *name, List type)
 {
     size_t name_len = strlen(name);
-    set_Variable_insert(&ctx->types, (Variable){ 
-        .name = (List){ .tag = tag_symbole, .size = name_len, .str = List_duplicate(ctx, name, name_len) }, 
+    set_Variable_insert(&ctx->variables, (Variable){ 
+        .name = (List){ 
+            .tag = tag_symbole, 
+            .size = name_len, 
+            .str = List_duplicate(ctx, name, name_len)
+        },
         .value = type, 
         .type = TYPE_TYPE
     });

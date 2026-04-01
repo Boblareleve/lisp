@@ -98,8 +98,8 @@ typedef struct Lisp_context
 {
     // globals
     set_Variable variables; 
-    set_Variable functions;
-    set_Variable types;
+    // set_Variable functions;
+    // set_Variable types;
 
     // stack (local)
     da_da_Variable args_stack;
@@ -184,6 +184,7 @@ bool unload_dl(const List dl);
 bool get_fun_dl(Lisp_context *ctx, List lib, List *out, const List name, const List desc);
 
 // type.c
+bool have_function_shape(const List li);
 bool is_of_type(const List li, const List type);
 bool type_equal(const List a, const List b);
 void add_simple_type(Lisp_context *ctx, const char *name, List type);
