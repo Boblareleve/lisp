@@ -1018,6 +1018,20 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             return true;
         }
+        if (List_equal_lit(op, "len"))
+        {
+            TRY(li.size == 2);
+            List list = {0};
+            TRY(eval(ctx, li.list[1], &list));
+            TRY(list.tag == tag_list 
+             || list.tag == tag_string
+             || list.tag == tag_symbole);
+            *out = (List){
+                .tag = tag_integer,
+                .integer = list.size
+            };
+            return true;
+        }
         
         /* if (List_equal_lit(op, "$"))
         {

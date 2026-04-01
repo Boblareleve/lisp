@@ -8,10 +8,12 @@
 #include "utils.h"
 #include "sets.h"
 #include <stdlib.h>
-#include <setjmp.h>
+// #include <setjmp.h>
+#include <ffi.h>
 
 #define AR_MAX_ALIGN 8
 #include "ar.h"
+
 
 typedef enum List_tag : uint8_t
 {
@@ -25,9 +27,21 @@ typedef enum List_tag : uint8_t
     ttag_any_type, // can only be use in type_tag fild of List 
     tag_void_ptr,  // C struct handel
     tag_dynamic_lib,
-    tag_foreign_function,
+    tag_foreign_function, // Foreign_fun
 } List_tag;
 
+
+typedef struct
+{
+    ffi_cif cif;
+    size_t args_size;
+    ffi_type *args[0];
+} Foreign_fun;
+
+// typedef struct Foreign_fun
+// {
+//     ffi_cif ffi;
+// } Foreign_fun;
 
 
 #define NIL_LIST (List){0}
@@ -58,6 +72,7 @@ struct List
         double real;
         int64_t integer;
         void *ptr;
+        Foreign_fun *ffun;
     };
 };
 static_assert(sizeof(List) == 16);
@@ -126,7 +141,8 @@ static inline const char *tag_to_string(int tag)
 }
 static inline void *List_get_ptr(const List *li)
 {
-    if (li->tag == tag_list)
+    assert(li->tag != tag_foreign_function || li->offset == 0); // tag_foreign_function -> .offset == 0
+    if (li->tag == tag_list || li->tag == tag_foreign_function)
         return (void*)(li->list - (uintptr_t)li->offset);
     if (li->tag == tag_symbole || li->tag == tag_string)
         return (void*)(li->str - (uintptr_t)li->offset);
@@ -165,7 +181,7 @@ bool garbage_collector(Lisp_context *ctx);
 // dl.c
 List load_dl(const List path);
 bool unload_dl(const List dl);
-List get_fun_dl(List lib, const List name, const List desc);
+bool get_fun_dl(Lisp_context *ctx, List lib, List *out, const List name, const List desc);
 
 // type.c
 bool is_of_type(const List li, const List type);

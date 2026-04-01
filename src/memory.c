@@ -99,7 +99,7 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
         
         *f = gc_tag(*f);
     }
-
+    
     if ((
         li.tag == ttag_any_type 
      && li.type_tag == tag_list 

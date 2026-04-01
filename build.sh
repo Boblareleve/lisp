@@ -4,20 +4,20 @@ WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wn
 
 OUT=lisp_d
 SRC='src/main.c src/lisp.c src/dump.c src/parse.c src/memory.c src/dl.c src/type.c'
-
+LIB='-lffi -lm'
 
 case $1 in
     release)
         OUT=lisp_r
-        gcc  $SRC -o $OUT -I$MY_LIB -lm $WFLAGS -DNDEBUG -O1 
+        gcc  $SRC -o $OUT -I$MY_LIB $LIB $WFLAGS -DNDEBUG -O1 
     ;;
     debug)
         OUT=lisp_d
-        gcc  $SRC  -o $OUT -I$MY_LIB -lm $WFLAGS -DDEBUG -ggdb  
+        gcc  $SRC  -o $OUT -I$MY_LIB $LIB $WFLAGS -DDEBUG -ggdb  
     ;;
     sanitized)
         OUT=lisp_s
-        gcc  $SRC  -o $OUT -I$MY_LIB -g3 $WFLAGS -DDEBUG -DGC_REPORT -lm -fsanitize=address,undefined 
+        gcc  $SRC  -o $OUT -I$MY_LIB $LIB -g3 $WFLAGS -DDEBUG -DGC_REPORT -fsanitize=address,undefined 
     ;;
     _)
     ;;

@@ -1,6 +1,6 @@
 ;; '(0 1 1 2 3 5 8 13 21 34)
 t
-(defun fib ((n)
+(defun fib ((n int int)
     ;; (print n "\n")
     
     (if (<= n 1) (return n))
@@ -11,13 +11,11 @@ t
 ))
 
 
-;; (print (fib 4)  "\n")
-;; (print (fib 9)  "\n")
-;; (print (fib 10) "\n")
-;; (print (fib 20) "\n")
-;; (print (fib 25) "\n")
-;; (print (fib 30) "\n")
-;; (print (fib 40) "\n")
+;; (local i 0)
+;; (while (<= i 40)
+;;     (print i  " " (fib i)  "\n")
+;;     (++ i)
+;; )
 
 (&&
     (== (fib 9) 34)
