@@ -100,7 +100,12 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
         *f = gc_tag(*f);
     }
 
-    if (li.tag == tag_list)
+    if ((
+        li.tag == ttag_any_type 
+     && li.type_tag == tag_list 
+     && li.size != TYPE_UNDEFINED_LIST_SIZE
+    )
+     || li.tag == tag_list)
         for (int i = 0; i < li.size; i++)
             gc_traverse_mark(ctx, li.list[i]);
 }

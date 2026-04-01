@@ -119,35 +119,52 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     const List args_def = func_def.list[0];
     TRY(args_def.tag == tag_list);
 
-    TRY(args_def.size == li.size - 1, error_log("expected %d arguments got %d", args_def.size, li.size-1));
     
+    int arg_position = 0;
+    List return_type = ANY_TYPE; 
     { // push args with their names in stack
         da_Variable new_frame = {0};
-        
+        bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
         for (int i = 0; i < args_def.size; i++)
         {
             if (args_def.list[i].tag == tag_type)
             {
+                if (have_a_type_hint)
+                {
+                    TRY(i + 1 == args_def.size, error_log("two function argument hint not at the end of the argument list"));
+                    return_type = args_def.list[i];
+                    continue; // <=> break;
+                }
                 TRY(i > 0, error_log("type decoration goes after a symbole"));
                 da_top(&new_frame).type = args_def.list[i];
                 TRY(is_of_type(da_top(&new_frame).value, da_top(&new_frame).type));
+                have_a_type_hint = true;
                 continue;
             }
             TRY(args_def.list[i].tag == tag_symbole);
             Variable *type = get_type(ctx, args_def.list[i]);
             if (type)
             {
+                if (have_a_type_hint)
+                {
+                    TRY(i + 1 == args_def.size, error_log("two function argument hint not at the end of the argument list"));
+                    return_type = type->value;
+                    continue; // <=> break;
+                }
                 TRY(i > 0, error_log("type decoration goes after a symbole"));
                 da_top(&new_frame).type = type->value;
                 TRY(is_of_type(da_top(&new_frame).value, da_top(&new_frame).type));
+                have_a_type_hint = true;
                 continue;
             }
+            have_a_type_hint = false; 
             da_push(&new_frame, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
-            TRY(eval(ctx, li.list[i+1], &da_top(&new_frame).value));
+            TRY(eval(ctx, li.list[arg_position++ +1], &da_top(&new_frame).value));
         }
         da_push(&ctx->args_stack, new_frame);
     }
-
+    // TRY(args_def.size == li.size - 1, error_log("expected %d arguments got %d", args_def.size, li.size-1));
+    
     // execute statements
     for (int i = 1; i+1 < func_def.size; i++)
         if (!eval(ctx, func_def.list[i], out) && ctx->in_return)
@@ -160,7 +177,7 @@ bool eval_function(Lisp_context *ctx, const List li, const List *function_def, L
     
     // return the last one
     GOTRY(eval(ctx, func_def.list[func_def.size-1], out));
-    
+    GOTRY(is_of_type(*out, return_type), error_log("function return unexpected type"));
 end:
     res = true;
 fail:
@@ -397,12 +414,13 @@ static inline List g_than_List(List a, List b)
 }
 static inline List typeof_List(Lisp_context *ctx, List li)
 {
-    Strv sv = Strv_stride(Strv_ccstr((char*)tag_to_string(li.tag)), 4);
-    return (List){
-        .tag = tag_string,
-        .str = List_duplicate(ctx, sv.arr, sv.size),
-        .size = sv.size
+    UNUSED(ctx);
+    List res = {
+        .tag = tag_type,
+        .type_tag = li.tag,
+        .size = (li.tag == tag_list) ? li.size : 0
     };
+    return res;
 }
 
 
@@ -982,6 +1000,24 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             
             return true;
         }
+        if (List_equal_lit(op, "type"))
+        {
+            TODO("type");
+            TRY(li.size == 2);
+            *out = (List){
+                .tag = tag_type,
+                .type_tag = li.list[1].tag,
+            };
+            if (out->tag == tag_list)
+            {
+                out->size = li.list[1].size,
+                out->list = List_alloc(ctx, sizeof(List) * (li.size - 1));
+            }
+            for (int i = 1; i < li.size; i++)
+                TRY(eval(ctx, li.list[i], &out->list[i-1]));
+            
+            return true;
+        }
         
         /* if (List_equal_lit(op, "$"))
         {
@@ -1038,6 +1074,7 @@ bool List_equal(const List li1, const List li2)
     case tag_string:    return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_symbole:   return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_true:      return li2.tag == tag_true;
+    case tag_type:      return type_compatible(li1, li2);
     default: UNREACHABLE("List equal");
     }
     return false;

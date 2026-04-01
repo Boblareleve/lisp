@@ -169,6 +169,9 @@ List get_fun_dl(List lib, const List name, const List desc);
 
 // type.c
 bool is_of_type(const List li, const List type);
+bool type_equal(const List a, const List b);
 void add_simple_type(Lisp_context *ctx, const char *name, List type);
+bool type_compatible(const List a, const List b);
+
 
 #endif /* LISP_H */

@@ -11,6 +11,8 @@
                      ("default")
                   ))
     - eval / parse
-    - typeof list -> "string"|"interger"|"list"|"real"|...
  + C-API
-   
+ + handle the collision between types/local/global symboles
+ + type
+    - typeof list -> TYPE
+    - how to handle list/tuple 
