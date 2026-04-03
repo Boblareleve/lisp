@@ -328,6 +328,31 @@ bool primitive_assign(const List li, List *out)
     return true;
 }
 
+// if (List_equal_lit(op, "[]="))
+bool primitive_bracket_assign(const List li, List *out)
+{
+    UNUSED(out);
+    TRY(li.size == 4, error_log("expected 4 element list for []= got %d", li.size));
+    
+    List list = {0};
+    TRY(eval(li.list[1], &list));
+    TRY(list.tag == tag_list, error_log("expected a list to index %s", tag_to_string(list.tag)));
+    
+    List index_l = {0};
+    TRY(eval(li.list[2], &index_l));
+    TRY(index_l.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_l.tag)));
+    int i_index_l = index_l.integer;
+    TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
+    
+    List res = {0};
+    TRY(eval(li.list[3], &res));
+    list.list[i_index_l] = res;
+    return true;
+
+    // TODO: pack unpack (py)->  [a, b] = [1, 2][:]
+    // ([]= '(a b c) 0 3 '(A B C))
+}
+
 // if (List_equal_lit(op, "[]"))
 bool primitive_square_bracket(const List li, List *out)
 {
@@ -908,6 +933,32 @@ bool primitive_dollar(const List li, List *out)
     return true;
 }
 
+bool primitive_reference(const List li, List *out)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "reference"));
+
+    TRY(li.size == 2);
+    *out = (List){
+        .tag = tag_reference,
+        .list = List_duplicate(&li.list[1], sizeof(li.list[1]))
+    };
+    
+    return true;
+}
+
+bool primitive_dereference(const List li, List *out)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "dereference"));
+
+
+    TRY(li.size == 2, error_log("expected 1 argument for dereference"));
+    List to_deref = {0};
+    TRY(eval(li.list[1], &to_deref));
+    TRY(to_deref.tag == tag_reference, error_log("exprected a tag_reference but got %s", tag_to_string(to_deref.tag)));
+    *out = *to_deref.list;
+
+    return true;
+}
 
 
 typedef struct Primitive
@@ -946,43 +997,45 @@ SET_IMPLEMENT_HASH_SET(Primitive, SET_PRIM_IS_NULL, SET_PRIM_SET_NULL, 2, 0.7, 6
 
 
 static const Primitive keys[] = {
-    { .name = _cstr_to_List("local"),   .fun = primitive_local              },
-    { .name = _cstr_to_List("tlocal"),  .fun = primitive_tlocal             },
-    { .name = _cstr_to_List("global"),  .fun = primitive_global             },
-    { .name = _cstr_to_List("defun"),   .fun = primitive_defun              },
-    { .name = _cstr_to_List("="),       .fun = primitive_assign             },
-    { .name = _cstr_to_List("[]"),      .fun = primitive_square_bracket     },
-    { .name = _cstr_to_List("copy"),    .fun = primitive_copy               },
-    { .name = _cstr_to_List("?"),       .fun = primitive_exclamation_mark   },
-    { .name = _cstr_to_List("if"),      .fun = primitive_if                 },
-    { .name = _cstr_to_List("print"),   .fun = primitive_print              },
-    { .name = _cstr_to_List("while"),   .fun = primitive_while              },
-    { .name = _cstr_to_List("return"),  .fun = primitive_return             },
-    { .name = _cstr_to_List("+"),       .fun = primitive_plus               },
-    { .name = _cstr_to_List("++"),      .fun = primitive_increment          },
-    { .name = _cstr_to_List("--"),      .fun = primitive_decrement          },
-    { .name = _cstr_to_List("-"),       .fun = primitive_minus              },
-    { .name = _cstr_to_List("*"),       .fun = primitive_product            },
-    { .name = _cstr_to_List("/"),       .fun = primitive_div                },
-    { .name = _cstr_to_List("//"),      .fun = primitive_integer_div        },
-    { .name = _cstr_to_List("=="),      .fun = primitive_equal              },
-    { .name = _cstr_to_List("<="),      .fun = primitive_less_or_equal_than },
-    { .name = _cstr_to_List(">="),      .fun = primitive_more_or_equal_than },
-    { .name = _cstr_to_List(">"),       .fun = primitive_more_than          },
-    { .name = _cstr_to_List("<"),       .fun = primitive_less_than          },
-    { .name = _cstr_to_List("!="),      .fun = primitive_not_equal          },
-    { .name = _cstr_to_List("!"),       .fun = primitive_not                },
-    { .name = _cstr_to_List("&&"),      .fun = primitive_and                },
-    { .name = _cstr_to_List("||"),      .fun = primitive_or                 },
-    { .name = _cstr_to_List("first"),   .fun = primitive_first              },
-    { .name = _cstr_to_List("next"),    .fun = primitive_next               },
-    { .name = _cstr_to_List("for"),     .fun = primitive_for                },
-    { .name = _cstr_to_List("format"),  .fun = primitive_format             },
-    { .name = _cstr_to_List("quote"),   .fun = primitive_quote              },
-    { .name = _cstr_to_List("typeof"),  .fun = primitive_typeof             },
-    { .name = _cstr_to_List("eval"),    .fun = primitive_eval               },
-    { .name = _cstr_to_List("type"),    .fun = primitive_type               },
-    { .name = _cstr_to_List("len"),     .fun = primitive_len                },
+    { .name = _cstr_to_List("local"),       .fun = primitive_local              },
+    { .name = _cstr_to_List("tlocal"),      .fun = primitive_tlocal             },
+    { .name = _cstr_to_List("global"),      .fun = primitive_global             },
+    { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
+    { .name = _cstr_to_List("="),           .fun = primitive_assign             },
+    { .name = _cstr_to_List("[]"),          .fun = primitive_square_bracket     },
+    { .name = _cstr_to_List("copy"),        .fun = primitive_copy               },
+    { .name = _cstr_to_List("?"),           .fun = primitive_exclamation_mark   },
+    { .name = _cstr_to_List("if"),          .fun = primitive_if                 },
+    { .name = _cstr_to_List("print"),       .fun = primitive_print              },
+    { .name = _cstr_to_List("while"),       .fun = primitive_while              },
+    { .name = _cstr_to_List("return"),      .fun = primitive_return             },
+    { .name = _cstr_to_List("+"),           .fun = primitive_plus               },
+    { .name = _cstr_to_List("++"),          .fun = primitive_increment          },
+    { .name = _cstr_to_List("--"),          .fun = primitive_decrement          },
+    { .name = _cstr_to_List("-"),           .fun = primitive_minus              },
+    { .name = _cstr_to_List("*"),           .fun = primitive_product            },
+    { .name = _cstr_to_List("/"),           .fun = primitive_div                },
+    { .name = _cstr_to_List("//"),          .fun = primitive_integer_div        },
+    { .name = _cstr_to_List("=="),          .fun = primitive_equal              },
+    { .name = _cstr_to_List("<="),          .fun = primitive_less_or_equal_than },
+    { .name = _cstr_to_List(">="),          .fun = primitive_more_or_equal_than },
+    { .name = _cstr_to_List(">"),           .fun = primitive_more_than          },
+    { .name = _cstr_to_List("<"),           .fun = primitive_less_than          },
+    { .name = _cstr_to_List("!="),          .fun = primitive_not_equal          },
+    { .name = _cstr_to_List("!"),           .fun = primitive_not                },
+    { .name = _cstr_to_List("&&"),          .fun = primitive_and                },
+    { .name = _cstr_to_List("||"),          .fun = primitive_or                 },
+    { .name = _cstr_to_List("first"),       .fun = primitive_first              },
+    { .name = _cstr_to_List("next"),        .fun = primitive_next               },
+    { .name = _cstr_to_List("for"),         .fun = primitive_for                },
+    { .name = _cstr_to_List("format"),      .fun = primitive_format             },
+    { .name = _cstr_to_List("quote"),       .fun = primitive_quote              },
+    { .name = _cstr_to_List("typeof"),      .fun = primitive_typeof             },
+    { .name = _cstr_to_List("eval"),        .fun = primitive_eval               },
+    { .name = _cstr_to_List("type"),        .fun = primitive_type               },
+    { .name = _cstr_to_List("len"),         .fun = primitive_len                },
+    { .name = _cstr_to_List("reference"),   .fun = primitive_reference          },
+    { .name = _cstr_to_List("dereference"), .fun = primitive_dereference        },
 };
 
 /* uint32_t primitive_hash(const List str, uint32_t seed)

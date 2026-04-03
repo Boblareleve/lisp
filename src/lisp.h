@@ -24,10 +24,11 @@ typedef enum List_tag : uint8_t
     tag_integer,   // 4326324
     tag_real,      // 3.3
     tag_type,      // int...
-    ttag_any_type, // can only be use in type_tag fild of List 
+    tag_reference,
     tag_void_ptr,  // C struct handel
     tag_dynamic_lib,
     tag_foreign_function, // Foreign_fun
+    ttag_any_type, // can only be use in type_tag fild of List 
 } List_tag;
 
 
@@ -136,13 +137,17 @@ static inline const char *tag_to_string(int tag)
         [tag_void_ptr]         = "tag_void_ptr",
         [tag_foreign_function] = "tag_foreign_function",
         [tag_type]             = "tag_type",
+        [tag_reference]        = "tag_reference",
     };
     return table[tag];
 }
 static inline void *List_get_ptr(const List *li)
 {
     assert(li->tag != tag_foreign_function || li->offset == 0); // tag_foreign_function -> .offset == 0
-    if (li->tag == tag_list || li->tag == tag_foreign_function)
+    assert(li->tag != tag_reference        || li->offset == 0); // tag_reference        -> .offset == 0
+    if (li->tag == tag_list
+     || li->tag == tag_foreign_function
+     || li->tag == tag_reference)
         return (void*)(li->list - (uintptr_t)li->offset);
     if (li->tag == tag_symbole || li->tag == tag_string)
         return (void*)(li->str - (uintptr_t)li->offset);

@@ -133,6 +133,7 @@ void gc_traverse_mark(List li)
 //     }
 //     return true;
 // }
+
 void erase_untag(set_void_ptr *gc)
 {
     for (int i = 0; i < gc->capacity; i++)

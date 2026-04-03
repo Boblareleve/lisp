@@ -214,7 +214,7 @@ bool eval(const List li, List *out)
         out->quote_count--;
         return true;
     }
-
+    
     switch (li.tag)
     {
     // self-evaluating
@@ -224,6 +224,9 @@ bool eval(const List li, List *out)
     case tag_integer:
     case tag_real: {
         *out = li;
+    } return true;
+    case tag_reference: {
+        *out = *li.list;
     } return true;
 
     case tag_symbole: {

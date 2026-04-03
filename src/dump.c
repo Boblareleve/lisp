@@ -23,6 +23,10 @@ bool _dump_indent(Strb *out, const List li, int indent)
         Strb_cat_nchar(out, indent, ' ');
         Strb_cat(out, ")\n");
     } break;
+    case tag_reference: {
+        Strb_cat(out, "*");
+        TRY(_dump_indent(out, *li.list, indent));
+    } break;
     case tag_real:      Strb_catf(out, "%.0f64", li.real);         break;
     case tag_integer:   Strb_catf(out, "%d64",   li.integer);      break;
     case tag_symbole:   Strb_catf(out, "%.*s",   li.size, li.str); break;
