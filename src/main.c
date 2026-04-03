@@ -50,6 +50,7 @@ bool test_eval(List root)
     );
 
     Lisp_context_free();
+    
     return true;
 fail:
     Lisp_context_free();
@@ -86,6 +87,7 @@ int main(int argc, char **argv)
         if (Strb_cat_file(&raw, argv[i]))
         {
             fprintf(fd, "[TEST] file '%s' not found\n", argv[i]);
+            Strb_free(raw);
             continue ;
         }
         
@@ -99,7 +101,7 @@ int main(int argc, char **argv)
     }
     Strb_free(error);
 
-    
+    free(g_ctx);
     return 0;
 }
 

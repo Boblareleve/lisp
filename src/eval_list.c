@@ -318,18 +318,25 @@ bool primitive_assign(const List li, List *out)
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "="));
     UNUSED(out);
     TRY(li.size == 3, error_log("expected 3 element list for set got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(li.list[1].tag)));
-
-    Variable var = { .name = li.list[1], .type = ANY_TYPE };
-    TRY(eval(li.list[2], &var.value));
-    
-    TRY(mutate_Variable(var));
-
-    return true;
+    if (li.list[1].tag == tag_symbole)
+    {
+        Variable var = { .name = li.list[1], .type = ANY_TYPE };
+        TRY(eval(li.list[2], &var.value));
+        TRY(mutate_Variable(var));
+        return true;
+    }
+    if (li.list[1].tag == tag_reference)
+    {
+        assert(li.list[1].list);
+        TRY(eval(li.list[2], li.list[1].list));
+        return true;
+    }
+    error_log("expected a symbole or a reference to set to got %s", tag_to_string(li.list[1].tag));
+    return false;
 }
 
 // if (List_equal_lit(op, "[]="))
-bool primitive_bracket_assign(const List li, List *out)
+/* bool primitive_bracket_assign(const List li, List *out)
 {
     UNUSED(out);
     TRY(li.size == 4, error_log("expected 4 element list for []= got %d", li.size));
@@ -352,8 +359,10 @@ bool primitive_bracket_assign(const List li, List *out)
     // TODO: pack unpack (py)->  [a, b] = [1, 2][:]
     // ([]= '(a b c) 0 3 '(A B C))
 }
+ */
 
-// if (List_equal_lit(op, "[]"))
+
+ // if (List_equal_lit(op, "[]"))
 bool primitive_square_bracket(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "[]"));
@@ -383,8 +392,12 @@ bool primitive_square_bracket(const List li, List *out)
         // printf("->> [%d:%d] %d %d\n", i_index_l, i_index_h, out->size, out->offset);
         return true;
     }
-
-    *out = list.list[i_index_l];
+    
+    *out = (List){
+        .tag = tag_reference,
+        .list = &list.list[i_index_l],
+        .offset = i_index_l
+    };
     return true;
 }
 
@@ -1071,7 +1084,7 @@ void init_primitive_map(void)
 primitive_t get_Primitive(const List op)
 {
     // return map[primitive_hash(op, 6436)%ARRAY_LEN(map)];
-    return set_unwrap(set_Primitive_get(&map, (Primitive){ .name = op }), fun);
+    return struct_unwrap(set_Primitive_get(&map, (Primitive){ .name = op }), fun);
 }
 
 bool test_get_Primitive(void)

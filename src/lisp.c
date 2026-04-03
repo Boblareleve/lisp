@@ -94,17 +94,16 @@ bool global_Variable(Variable var)
 // false on not found
 bool mutate_Variable(Variable var)
 {
-    if (g_ctx->args_stack.size > 0)
-        da_for (Variable, it, &da_top(&g_ctx->args_stack))
-            if (List_str_equal(it->name, var.name))
-            {
-                TRY(is_of_type(var.value, it->type), error_log("mutate value in stack to a value of an unexpected type"));
-                it->value = var.value;
-                return true;
-            }
+    Variable *old = NULL;
+
+    if ((old = get_local_Variable(var.name)))
+    {
+        TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
+        old->value = var.value;
+        return true;
+    }
     
-    Variable *old = set_Variable_emplace(&g_ctx->variables, var);
-    if (!VAR_IS_NULL(*old))
+    if ((old = get_global_Variable(var.name)))
     {
         TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
         old->value = var.value;
@@ -198,12 +197,10 @@ fail:
 }
 
 
-
-
-
-
 bool eval(const List li, List *out)
 {
+    
+
     TRY(out, error_log("no output"));
     *out = NIL_LIST;
 
@@ -214,7 +211,7 @@ bool eval(const List li, List *out)
         out->quote_count--;
         return true;
     }
-    
+
     switch (li.tag)
     {
     // self-evaluating
@@ -225,8 +222,10 @@ bool eval(const List li, List *out)
     case tag_real: {
         *out = li;
     } return true;
-    case tag_reference: {
-        *out = *li.list;
+
+    case tag_reference: { // auto dereference
+        List res = *li.list;
+        TRY(eval(res, out));
     } return true;
 
     case tag_symbole: {
@@ -235,7 +234,7 @@ bool eval(const List li, List *out)
         *out = var->value;
     } return true;
     case tag_list: {
-
+        
         // nil|false
         if (IS_NIL(li))
         {
@@ -252,10 +251,9 @@ bool eval(const List li, List *out)
         const List op = *li.list; 
         TRY(op.tag == tag_symbole, error_log("unkown first list element primitive"));
         
-        // TODO transform into an prefect hash table
-        // uint16_t a = *(uint16_t)&op.str.arr;
         primitive_t primitive = get_Primitive(op);
         if (primitive) return primitive(li, out);
+
         
         Variable *var = get_Variable(op);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", op.size, op.str));
@@ -392,5 +390,8 @@ void Lisp_context_free(void)
 
     
     set_void_ptr_free(&g_ctx->gc);
+
+    free(g_ctx);
+    g_ctx = NULL;
 }
 

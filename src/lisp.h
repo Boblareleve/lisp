@@ -144,7 +144,6 @@ static inline const char *tag_to_string(int tag)
 static inline void *List_get_ptr(const List *li)
 {
     assert(li->tag != tag_foreign_function || li->offset == 0); // tag_foreign_function -> .offset == 0
-    assert(li->tag != tag_reference        || li->offset == 0); // tag_reference        -> .offset == 0
     if (li->tag == tag_list
      || li->tag == tag_foreign_function
      || li->tag == tag_reference)
