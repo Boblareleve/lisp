@@ -575,6 +575,28 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             *out = list.list[i_index_l];
             return true;
         }
+        if (List_equal_lit(op, "[]="))
+        {
+            TRY(li.size == 4, error_log("expected 4 element list for []= got %d", li.size));
+            
+            List list = {0};
+            TRY(eval(ctx, li.list[1], &list));
+            TRY(list.tag == tag_list, error_log("expected a list to index %s", tag_to_string(list.tag)));
+            
+            List index_l = {0};
+            TRY(eval(ctx, li.list[2], &index_l));
+            TRY(index_l.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_l.tag)));
+            int i_index_l = index_l.integer;
+            TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
+            
+            List res = {0};
+            TRY(eval(ctx, li.list[3], &res));
+            list.list[i_index_l] = res;
+            return true;
+
+            // TODO: pack unpack (py)->  [a, b] = [1, 2][:]
+            // ([]= '(a b c) 0 3 '(A B C))
+        }
         if (List_equal_lit(op, "copy"))
         {
             TRY(li.size == 2, error_log("expected only 1 argument to be copyed got %d elements", li.size));
@@ -1032,7 +1054,23 @@ bool eval(Lisp_context *ctx, const List li, List *out)
             };
             return true;
         }
-        
+        if (List_equal_lit(op, "list"))
+        {
+            TRY(li.size == 2);
+            List count = {0};
+            TRY(eval(ctx, li.list[1], &count));
+
+            TRY(count.tag == tag_integer);
+            TRY(0 <= count.integer && count.integer < UINT16_MAX, error_log("too large new list of size %i64", count.integer));
+            *out = (List){
+                .tag = tag_list,
+                .size = count.integer,
+                .list = List_alloc(ctx, count.integer), // set all to NIL_LIST
+            };
+
+            return true;
+        }
+
         /* if (List_equal_lit(op, "$"))
         {
             TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
