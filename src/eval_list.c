@@ -908,11 +908,44 @@ bool primitive_dollar(const List li, List *out)
     return true;
 }
 
-static const struct
+
+
+typedef struct Primitive
 {
     List name;
     primitive_t fun;
-} keys[] = {
+} Primitive;
+
+
+uint64_t set_Primitive_hash(const Primitive prim, uint64_t seed)
+{
+    const List str = prim.name;
+    uint32_t f2chars = 0;
+    if (str.size == 0) return 0;
+    
+    if (str.size == 1)
+        f2chars = str.str[0] << 3*8; // <- useless
+    else
+        f2chars = (str.str[0]          << 0*8)
+                | (str.str[1]          << 1*8)
+                | (str.str[str.size-2] << 2*8)
+                | (str.str[str.size-1] << 3*8);
+    
+    return f2chars * seed;
+}
+int set_Primitive_equal(const Primitive a, const Primitive b)
+{
+    return List_str_equal(a.name, b.name);
+}
+
+
+SET_TYPEDEF_HASH_SET(Primitive);
+#define SET_PRIM_IS_NULL(p) ((p).fun == NULL)
+#define SET_PRIM_SET_NULL(p) ((p).fun = NULL)
+SET_IMPLEMENT_HASH_SET(Primitive, SET_PRIM_IS_NULL, SET_PRIM_SET_NULL, 2, 0.7, 64);
+
+
+static const Primitive keys[] = {
     { .name = _cstr_to_List("local"),   .fun = primitive_local              },
     { .name = _cstr_to_List("tlocal"),  .fun = primitive_tlocal             },
     { .name = _cstr_to_List("global"),  .fun = primitive_global             },
@@ -952,7 +985,7 @@ static const struct
     { .name = _cstr_to_List("len"),     .fun = primitive_len                },
 };
 
-uint32_t primitive_hash(const List str, uint32_t seed)
+/* uint32_t primitive_hash(const List str, uint32_t seed)
 {
     uint32_t f2chars = 0;
     if (str.size == 0) return 0;
@@ -967,22 +1000,25 @@ uint32_t primitive_hash(const List str, uint32_t seed)
     
     return f2chars * seed;
 }
-
 // parameters: s6436: c0 a71
 static primitive_t map[71] = {0};
+ */
 
+static set_Primitive map = {0};
 void init_primitive_map(void)
 {
     static_for (i, keys)
-    {
-        int h = primitive_hash(keys[i].name, 6436) % ARRAY_LEN(map);
-        map[h] = keys[i].fun;
-    }
+        set_Primitive_insert(&map, keys[i]);
+    // {
+        // int h = primitive_hash(keys[i].name, 6436) % ARRAY_LEN(map);
+        // map[h] = keys[i].fun;
+    // }
 }
 
 primitive_t get_Primitive(const List op)
 {
-    return map[primitive_hash(op, 6436)%ARRAY_LEN(map)];
+    // return map[primitive_hash(op, 6436)%ARRAY_LEN(map)];
+    return set_unwrap(set_Primitive_get(&map, (Primitive){ .name = op }), fun);
 }
 
 bool test_get_Primitive(void)
