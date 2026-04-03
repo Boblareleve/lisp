@@ -121,7 +121,7 @@ List escaping(Strv str)
     List result = {
         .tag = tag_string,
         .size = res.size,
-        .str = List_duplicate(NULL, res.arr, res.size)
+        .str = List_duplicate(res.arr, res.size)
     };
     if (str.size >= (int)sizeof(buffer)) free(res.arr);
     return result;
@@ -172,7 +172,7 @@ bool list(Strv *str, List *li)
         } while (str->size > 0 && Strv_first(*str) != ')');
         Strv_inc(str);
 
-        li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
+        li->list = List_duplicate(li->list, li->size * sizeof(List));
         Ar_restore(&arena, save);
 
         return true;
@@ -243,7 +243,7 @@ bool list(Strv *str, List *li)
     
     *li = (List){
         .tag = tag_symbole,
-        .str = List_duplicate(NULL, symbole.arr, symbole.size),
+        .str = List_duplicate(symbole.arr, symbole.size),
         .size = symbole.size
     };
     return true;
@@ -274,7 +274,7 @@ bool lists(Strv str, List *li)
         skip_comment(&str);
     }
 
-    li->list = List_duplicate(NULL, li->list, li->size * sizeof(List));
+    li->list = List_duplicate(li->list, li->size * sizeof(List));
 
     Ar_restore(&arena, save);
     return true;

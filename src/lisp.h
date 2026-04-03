@@ -155,6 +155,8 @@ static inline void *List_get_ptr(const List *li)
 #define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))
 #define List_equal_lit(li, lit) Strv_equal_lit(List_to_Strv(li), lit)
 
+extern Lisp_context *g_ctx;
+
 
 // parse.c
 bool list(Strv *str, List *li);
@@ -165,30 +167,35 @@ bool dump(Strb *out, const List li);
 bool List_print(const List li);
 
 // lisp.c
-bool eval(Lisp_context *ctx, const List li, List *out);
+bool eval(const List li, List *out);
 bool List_equal(const List li1, const List li2);
 void List_free(List *li);
-List List_copy(Lisp_context *ctx, const List li);
-Lisp_context Lisp_context_init(List root);
-void Lisp_context_free(Lisp_context *ctx);
+List List_copy(const List li);
+Lisp_context *Lisp_context_init(List root);
+void set_Lisp_context(Lisp_context *ctx);
+void Lisp_context_free(void);
 
 // memory.c
-void *List_alloc(Lisp_context *ctx, size_t count);
-void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count);
-void *List_duplicate(Lisp_context *ctx, const void *src, size_t count);
-bool garbage_collector(Lisp_context *ctx);
+void *List_alloc(size_t count);
+void *List_delc_alloc(void *ptr, size_t count);
+void *List_duplicate(const void *src, size_t count);
+bool garbage_collector(void);
 
 // dl.c
 List load_dl(const List path);
 bool unload_dl(const List dl);
-bool get_fun_dl(Lisp_context *ctx, List lib, List *out, const List name, const List desc);
+bool get_fun_dl(List lib, List *out, const List name, const List desc);
 
 // type.c
 bool have_function_shape(const List li);
 bool is_of_type(const List li, const List type);
 bool type_equal(const List a, const List b);
-void add_simple_type(Lisp_context *ctx, const char *name, List type);
+void add_simple_type(const char *name, List type);
 bool type_compatible(const List a, const List b);
+
+// eval_list.c
+void init_primitive_map(void);
+primitive_t get_Primitive(const List op);
 
 
 #endif /* LISP_H */

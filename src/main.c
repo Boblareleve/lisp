@@ -5,10 +5,12 @@ FILE *fd = NULL;
 
 bool test_eval(List root)
 {
-    Lisp_context ctx = Lisp_context_init(root);
+    
+    set_Lisp_context(Lisp_context_init(root));
+
     if (root.size == 0)
     {
-        Lisp_context_free(&ctx);
+        Lisp_context_free();
         return true;
     }
     
@@ -18,9 +20,9 @@ bool test_eval(List root)
         for (int i = 1; i < root.size; i++)
         {
             List tmp = {0};
-            if (!eval(&ctx, root.list[i], &tmp))
+            if (!eval(root.list[i], &tmp))
             {
-                Lisp_context_free(&ctx);
+                Lisp_context_free();
                 return true;
             }
         }
@@ -30,14 +32,14 @@ bool test_eval(List root)
 
     
     List expect = {0};
-    GOTRY(eval(&ctx, root.list[0], &expect), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+    GOTRY(eval(root.list[0], &expect), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
 
     // last expected to be equal to "expect"
     List tmp = (List){0};
     for (int i = 1; i < root.size; i++)
     {
         tmp = (List){0};
-        GOTRY(eval(&ctx, root.list[i], &tmp), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+        GOTRY(eval(root.list[i], &tmp), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
     }
     GOTRY(List_equal(expect, tmp),
         fprintf(fd, "unexpected result got: '");
@@ -47,10 +49,10 @@ bool test_eval(List root)
         fprintf(fd, "'\t");
     );
 
-    Lisp_context_free(&ctx);
+    Lisp_context_free();
     return true;
 fail:
-    Lisp_context_free(&ctx);
+    Lisp_context_free();
     error.size = 0;
     return false;
 }
@@ -74,6 +76,8 @@ bool test(const Strv str)
 
 int main(int argc, char **argv)
 {
+    init_primitive_map();
+    
     fd = stdout;
     for (int i = 1; i < argc; i++)
     {

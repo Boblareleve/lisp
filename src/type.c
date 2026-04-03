@@ -76,14 +76,14 @@ bool type_compatible(const List a, const List b)
     return true;
 }
     
-void add_simple_type(Lisp_context *ctx, const char *name, List type)
+void add_simple_type(const char *name, List type)
 {
     size_t name_len = strlen(name);
-    set_Variable_insert(&ctx->variables, (Variable){ 
+    set_Variable_insert(&g_ctx->variables, (Variable){ 
         .name = (List){ 
             .tag = tag_symbole, 
             .size = name_len, 
-            .str = List_duplicate(ctx, name, name_len)
+            .str = List_duplicate(name, name_len)
         },
         .value = type, 
         .type = TYPE_TYPE

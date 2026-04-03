@@ -46,9 +46,8 @@ ffi_type *List_type_to_ffi_type(const List type)
 
 
 // const List desc = (args1_t args2_t... return_t)
-bool get_fun_dl(Lisp_context *ctx, List lib, List *out, const List name, const List desc)
+bool get_fun_dl(List lib, List *out, const List name, const List desc)
 {
-    UNUSED(desc);
     TRY(name.tag == tag_string, error_log("name is not a string, got %s", tag_to_string(name.tag)));
     TRY(lib.tag == tag_dynamic_lib, error_log("lib is not a dl, got %s", tag_to_string(lib.tag)));
 
@@ -62,7 +61,7 @@ bool get_fun_dl(Lisp_context *ctx, List lib, List *out, const List name, const L
     const char *err = dlerror();
     TRY(fun_ptr && !err, error_log(err));
     
-    Foreign_fun *ffun = List_alloc(ctx, sizeof(Foreign_fun) + sizeof(ffi_type) * (desc.size-1));
+    Foreign_fun *ffun = List_alloc(sizeof(Foreign_fun) + sizeof(ffi_type) * (desc.size-1));
     ffun->args_size = desc.size-1;
 
     for (int i = 0; i < desc.size-1; i++)
