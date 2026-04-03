@@ -253,22 +253,9 @@ bool eval(const List li, List *out)
         
         // TODO transform into an prefect hash table
         // uint16_t a = *(uint16_t)&op.str.arr;
-        get
+        primitive_t primitive = get_Primitive(op);
+        if (primitive) return primitive(li, out);
         
-        /* if (List_equal_lit(op, "$"))
-        {
-            TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
-            List res = {0};
-            TRY(eval(li.list[1], &res));
-            TRY(res.tag == );
-
-            for (int i = 2; i < li.size; i++)
-            {
-            }
-            *out = res;
-            return true;
-        } */
-
         Variable *var = get_Variable(op);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", op.size, op.str));
         TRY(eval_function(li, &var->value, out));

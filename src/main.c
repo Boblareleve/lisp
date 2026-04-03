@@ -77,7 +77,8 @@ bool test(const Strv str)
 int main(int argc, char **argv)
 {
     init_primitive_map();
-    
+    test_get_Primitive();
+
     fd = stdout;
     for (int i = 1; i < argc; i++)
     {

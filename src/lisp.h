@@ -193,8 +193,12 @@ bool type_equal(const List a, const List b);
 void add_simple_type(const char *name, List type);
 bool type_compatible(const List a, const List b);
 
+
+
 // eval_list.c
+typedef bool (*primitive_t)(const List li, List *out);
 void init_primitive_map(void);
+bool test_get_Primitive(void);
 primitive_t get_Primitive(const List op);
 
 

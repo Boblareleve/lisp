@@ -1,9 +1,6 @@
 #include "eval_list.h"
 
-
-typedef bool (*primitive_t)(const List li, List *out);
-
-
+#define EVAL_LIST_ASSERT(expr) assert(expr);
 
 static inline List add_List(List a, List b)
 {
@@ -240,6 +237,8 @@ static inline List typeof_List(List li)
 // if (List_equal_lit(op, "local")) // create and initilize a local variable
 bool primitive_local(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "local"));
+    UNUSED(out);
     TRY(li.size == 3, error_log("expected 3 element list for local got %d", li.size));
     TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
     
@@ -254,6 +253,8 @@ bool primitive_local(const List li, List *out)
 // if (List_equal_lit(op, "tlocal")) // create and initilize a local variable
 bool primitive_tlocal(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "tlocal"));
+    UNUSED(out);
     TRY(li.size == 4, error_log("expected 4 element list for tlocal (type local) got %d", li.size));
 
     const List name = li.list[1];
@@ -275,6 +276,8 @@ bool primitive_tlocal(const List li, List *out)
 // if (List_equal_lit(op, "global")) // create and initilize a global variable
 bool primitive_global(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "global"));
+    UNUSED(out);
     TRY(li.size == 3, error_log("expected 3 element list for local got %d", li.size));
     TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
 
@@ -292,6 +295,8 @@ bool primitive_global(const List li, List *out)
 // if (List_equal_lit(op, "defun")) // same as global but don't eval argument 
 bool primitive_defun(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "defun"));
+    UNUSED(out);
     TRY(li.size == 3, error_log("expected 3 element list for defun got %d elements", li.size));
     TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to defun to got %s", tag_to_string(li.list[1].tag)));
 
@@ -310,6 +315,8 @@ bool primitive_defun(const List li, List *out)
 // if (List_equal_lit(op, "=")) // change value of a variable
 bool primitive_assign(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "="));
+    UNUSED(out);
     TRY(li.size == 3, error_log("expected 3 element list for set got %d", li.size));
     TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to set to got %s", tag_to_string(li.list[1].tag)));
 
@@ -324,6 +331,7 @@ bool primitive_assign(const List li, List *out)
 // if (List_equal_lit(op, "[]"))
 bool primitive_square_bracket(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "[]"));
     TRY(li.size == 3 || li.size == 4, error_log("expected 3 or 4 element list for [] got %d", li.size));
     
     List list = {0};
@@ -358,6 +366,7 @@ bool primitive_square_bracket(const List li, List *out)
 // if (List_equal_lit(op, "copy"))
 bool primitive_copy(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "copy"));
     TRY(li.size == 2, error_log("expected only 1 argument to be copyed got %d elements", li.size));
 
     List to_copy = {0};
@@ -369,6 +378,7 @@ bool primitive_copy(const List li, List *out)
 // if (List_equal_lit(op, "?"))
 bool primitive_exclamation_mark(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "?"));
     TRY(li.size == 4, error_log("expected 4 element for '?' got %d", li.size));
     List cond = {0};
     TRY(eval(li.list[1], &cond));
@@ -378,6 +388,7 @@ bool primitive_exclamation_mark(const List li, List *out)
 // if (List_equal_lit(op, "if"))
 bool primitive_if(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "if"));
     TRY(li.size == 3, error_log("expected 3 element for 'if' got %d", li.size));
     List cond = {0};
     TRY(eval(li.list[1], &cond));
@@ -389,6 +400,8 @@ bool primitive_if(const List li, List *out)
 // if (List_equal_lit(op, "print"))
 bool primitive_print(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "print"));
+    UNUSED(out);
     TRY(li.size >= 2, error_log("expected at least 2 elements for 'print' got %d", li.size));
 
     for (int i = 1; i < li.size; i++)
@@ -403,6 +416,7 @@ bool primitive_print(const List li, List *out)
 // if (List_equal_lit(op, "while"))
 bool primitive_while(const List li, List *out)
 { // return last value of the body and of the last iteration or () if no body
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "while"));
     TRY(li.size >= 2); // the condition can have side effects
     for (;;)
     {
@@ -420,6 +434,7 @@ bool primitive_while(const List li, List *out)
 // if (List_equal_lit(op, "return"))
 bool primitive_return(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "return"));
     TRY(li.size == 1 || li.size == 2);
     if (li.size == 2)
         TRY(eval(li.list[1], out));
@@ -431,6 +446,7 @@ bool primitive_return(const List li, List *out)
 // if (List_equal_lit(op, "+"))
 bool primitive_plus(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "+"));
     TRY(li.size >= 3, error_log("expected at least 3 elements for '+' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -449,6 +465,7 @@ bool primitive_plus(const List li, List *out)
 // if (List_equal_lit(op, "++"))
 bool primitive_increment(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "++"));
     TRY(li.size == 2);
     TRY(li.list[1].tag == tag_symbole, error_log("can only increment variable got %s", tag_to_string(li.list[1].tag)));
     
@@ -463,6 +480,7 @@ bool primitive_increment(const List li, List *out)
 // if (List_equal_lit(op, "--"))
 bool primitive_decrement(const List li, List *out)
 {
+    // EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "--"));
     TRY(li.size == 2);
     TRY(li.list[1].tag == tag_symbole, error_log("can only decrement variable got %s", tag_to_string(li.list[1].tag)));
     
@@ -477,6 +495,7 @@ bool primitive_decrement(const List li, List *out)
 // if (List_equal_lit(op, "-"))
 bool primitive_minus(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "-"));
     TRY(li.size >= 3, error_log("expected at least 3 elements for '-' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -496,6 +515,7 @@ bool primitive_minus(const List li, List *out)
 // if (List_equal_lit(op, "*"))
 bool primitive_product(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "*"));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '*' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -513,6 +533,7 @@ bool primitive_product(const List li, List *out)
 // if (List_equal_lit(op, "/"))
 bool primitive_div(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "/"));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '/' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -530,6 +551,7 @@ bool primitive_div(const List li, List *out)
 // if (List_equal_lit(op, "//"))
 bool primitive_integer_div(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "//"));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '//' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -547,6 +569,7 @@ bool primitive_integer_div(const List li, List *out)
 // if (List_equal_lit(op, "=="))
 bool primitive_equal(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "=="));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '==' got %d", li.size));
     
     List acc = {0};
@@ -568,6 +591,7 @@ bool primitive_equal(const List li, List *out)
 // if (List_equal_lit(op, "<="))
 bool primitive_less_or_equal_than(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<="));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '<=' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -585,6 +609,7 @@ bool primitive_less_or_equal_than(const List li, List *out)
 // if (List_equal_lit(op, ">="))
 bool primitive_more_or_equal_than(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">="));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '>=' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -602,6 +627,7 @@ bool primitive_more_or_equal_than(const List li, List *out)
 // if (List_equal_lit(op, ">"))
 bool primitive_more_than(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">"));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '>' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -619,6 +645,7 @@ bool primitive_more_than(const List li, List *out)
 // if (List_equal_lit(op, "<"))
 bool primitive_less_than(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<"));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '<' got %d", li.size));
     List res = {0};
     TRY(eval(li.list[1], &res));
@@ -636,6 +663,7 @@ bool primitive_less_than(const List li, List *out)
 // if (List_equal_lit(op, "!="))
 bool primitive_not_equal(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!="));
     TRY(li.size >= 3, error_log("expected at least 2 elements for '!=' got %d", li.size));
     
     List acc = {0};
@@ -656,6 +684,7 @@ bool primitive_not_equal(const List li, List *out)
 // if (List_equal_lit(op, "!"))
 bool primitive_not(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!"));
     TRY(li.size >= 2, error_log("expected at least 2 elements for '==' got %d", li.size));
     
     List res = {0};
@@ -668,6 +697,7 @@ bool primitive_not(const List li, List *out)
 // if (List_equal_lit(op, "&&"))
 bool primitive_and(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "&&"));
     TRY(li.size >= 3, error_log("expected at least 3 elements for '&&' got %d", li.size));
     
     for (int i = 1; i < li.size; i++)
@@ -685,6 +715,7 @@ bool primitive_and(const List li, List *out)
 // if (List_equal_lit(op, "||"))
 bool primitive_or(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "||"));
     TRY(li.size >= 3, error_log("expected at least 3 elements for '||' got %d", li.size));
     
     for (int i = 2; i < li.size; i++)
@@ -704,6 +735,7 @@ bool primitive_or(const List li, List *out)
 // if (List_equal_lit(op, "first"))
 bool primitive_first(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "first"));
     TRY(li.size == 2);
     TRY(eval(li.list[1], out),  *out = NIL_LIST);
     TRY(out->tag == tag_list,        *out = NIL_LIST);
@@ -716,6 +748,7 @@ bool primitive_first(const List li, List *out)
 // if (List_equal_lit(op, "next"))
 bool primitive_next(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "next"));
     TRY(li.size == 2);
     TRY(eval(li.list[1], out));
     TRY(out->tag == tag_list, *out = NIL_LIST);
@@ -741,6 +774,7 @@ bool primitive_next(const List li, List *out)
 // if (List_equal_lit(op, "for"))
 bool primitive_for(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "for"));
     TRY(li.size >= 4);
     TRY(li.list[1].tag == tag_symbole);
     
@@ -763,7 +797,8 @@ bool primitive_for(const List li, List *out)
 
 // if (List_equal_lit(op, "format"))
 bool primitive_format(const List li, List *out)
-{ // catstr
+{
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "format"));
     TRY(li.size >= 2);
 
     static Strb acc = {0};
@@ -775,24 +810,19 @@ bool primitive_format(const List li, List *out)
         TRY(eval(li.list[i], &tmp));
         TRY(dump(&acc, tmp));
     }
-
-    // Strb_fit(&acc);
-    // acc.arr = List_delc_alloc(acc.arr, acc.size);
-
-
-    // Strb_fit(&acc);
+    
     *out = (List){
         .tag = tag_string,
         .size = acc.size,
         .str = List_duplicate(acc.arr, acc.size)
     };
-    // Strb_free(acc);
     return true;
 }
 
 // if (List_equal_lit(op, "quote"))
 bool primitive_quote(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "quote"));
     TRY(li.size == 2);
     *out = li.list[1];
     return true;
@@ -801,6 +831,7 @@ bool primitive_quote(const List li, List *out)
 // if (List_equal_lit(op, "typeof"))
 bool primitive_typeof(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "typeof"));
     TRY(li.size == 2);
     TRY(eval(li.list[1], out));
     *out = typeof_List(*out);
@@ -810,6 +841,7 @@ bool primitive_typeof(const List li, List *out)
 // if (List_equal_lit(op, "eval"))
 bool primitive_eval(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "eval"));
     TRY(li.size >= 2);
     *out = (List){
         .tag = tag_list,
@@ -825,6 +857,7 @@ bool primitive_eval(const List li, List *out)
 // if (List_equal_lit(op, "type"))
 bool primitive_type(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "type"));
     TODO("type");
     TRY(li.size == 2);
     *out = (List){
@@ -845,6 +878,7 @@ bool primitive_type(const List li, List *out)
 // if (List_equal_lit(op, "len"))
 bool primitive_len(const List li, List *out)
 {
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "len"));
     TRY(li.size == 2);
     List list = {0};
     TRY(eval(li.list[1], &list));
@@ -858,6 +892,21 @@ bool primitive_len(const List li, List *out)
     return true;
 }
 
+// if (List_equal_lit(op, "$"))
+bool primitive_dollar(const List li, List *out)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "$"));
+    TODO("$");
+    TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
+    List res = {0};
+    TRY(eval(li.list[1], &res));
+
+    for (int i = 2; i < li.size; i++)
+    {
+    }
+    *out = res;
+    return true;
+}
 
 static const struct
 {
@@ -919,7 +968,6 @@ uint32_t primitive_hash(const List str, uint32_t seed)
     return f2chars * seed;
 }
 
-
 // parameters: s6436: c0 a71
 static primitive_t map[71] = {0};
 
@@ -944,13 +992,11 @@ bool test_get_Primitive(void)
     static_for (i, keys)
     {
         primitive_t p = get_Primitive(keys[i].name);
-        printf("-> p %p <> .fun %p\n", p, keys[i].fun);
+        // printf("-> p %p <> .fun %p\n", p, keys[i].fun);
         assert(keys[i].fun == p); // map[keys[i].name]);
     }
     return true;
 }
-
-
 
 /*
 
@@ -1216,4 +1262,5 @@ int _main(void)
     // }
     // else
     //     search_seed();
+    return 0;
 }
