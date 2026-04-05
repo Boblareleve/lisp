@@ -164,7 +164,6 @@ bool eval_function(const List li, const List *function_def, List *out)
 
     const List args_def = func_def.list[0];
     TRY(args_def.tag == tag_list, error_log("argument definition is not a list got %s", tag_to_string(args_def.tag)));
-
     
     List return_type = ANY_TYPE; 
     da_Variable new_frame = {0};
