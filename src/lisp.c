@@ -26,13 +26,12 @@ SET_IMPLEMENT_HASH_SET(Variable, VAR_IS_NULL, VAR_SET_NULL, 4, 0.8, 64);
 
 Variable *get_local_Variable(List name)
 {   
-    if (g_ctx->args_stack.size > 0)
-        da_for (Variable, it, &da_top(&g_ctx->args_stack))
-        {
-            TRY(it->name.tag == tag_symbole);
-            if (List_str_equal(it->name, name))
-                return it;
-        }
+    for (int i = g_ctx->stack.size - 1; i >= g_ctx->frame_index; i--)
+    {
+        TRY(g_ctx->stack.arr[i].name.tag == tag_symbole);
+        if (List_str_equal(g_ctx->stack.arr[i].name, name))
+            return &g_ctx->stack.arr[i];
+    }
     return NULL;
 }
 
@@ -66,17 +65,16 @@ Variable *get_Variable(List name)
 // return index in the call stack
 size_t local_Variable(Variable var)
 {
-    da_Variable *frame = &da_top(&g_ctx->args_stack);
-    if (g_ctx->args_stack.size > 0)
-        da_for (Variable, it, frame)
-            if (List_str_equal(it->name, var.name))
-            {
-                *it = var;
-                return da_idx_for(it, frame);
-            }
-    da_push(frame, var);
-    
-    return frame->size - 1;
+    for (int i = g_ctx->stack.size-1; i >= g_ctx->frame_index; i--)
+    {
+        if (List_str_equal(g_ctx->stack.arr[i].name, var.name))
+        {
+            g_ctx->stack.arr[i] = var;
+            return i;
+        }
+    }
+    da_push(&g_ctx->stack, var);
+    return g_ctx->stack.size-1;
 }
 
 // return true if it remplace a global variable
@@ -91,52 +89,53 @@ bool global_Variable(Variable var)
     return true;
 }
 
-// false on not found
-bool mutate_Variable(Variable var)
+
+bool pop_stack_frame(void)
 {
-    Variable *old = NULL;
-
-    if ((old = get_local_Variable(var.name)))
-    {
-        TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
-        old->value = var.value;
-        return true;
-    }
-    
-    if ((old = get_global_Variable(var.name)))
-    {
-        TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
-        old->value = var.value;
-        return true;
-    }
-
-    return false;
+    TRY(g_ctx->frame_index > 0, error_log("try to return from root stack frame"));
+    g_ctx->stack.size = g_ctx->frame_index-1;
+    assert(g_ctx->stack.arr[g_ctx->frame_index-1].name.tag == ttag_frame);
+    g_ctx->frame_index = g_ctx->stack.arr[g_ctx->frame_index].value.integer;
+    return true;
+}
+bool push_stack_frame(void)
+{
+    da_push(&g_ctx->stack, (Variable){
+        .name = { .tag = ttag_frame },
+        .value = {
+            .tag = tag_integer,
+            .integer = g_ctx->frame_index,
+        },
+        .type = ANY_TYPE   
+    });
+    g_ctx->frame_index = g_ctx->stack.size;
+    return true;
 }
 
-
-static inline bool prepare_function(da_Variable *new_frame, List *return_type, const List li, const List args_def)
-{    
-    // push args with their names in stack
+// push args with their names in stack
+static inline bool prepare_function(List *return_type, const List li, const List args_def)
+{
     bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
     int arg_position = 1;
-
+    
     for (int i = 0; i < args_def.size; i++)
     {
-        
         List type = NIL_LIST;
-        Variable *var_type = NULL;
-        if (args_def.list[i].tag == tag_type)
-            type = args_def.list[i];
-        else if ((var_type = get_Variable(args_def.list[i])) && var_type->value.tag == tag_type)
-            type = var_type->value;
-        else
-        { // normal argument
-            TRY(args_def.list[i].tag == tag_symbole);
-
-            have_a_type_hint = false; 
-            da_push(new_frame, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
-            TRY(eval(li.list[arg_position++], &da_top(new_frame).value));
-            continue;
+        {
+            Variable *var_type = NULL;
+            if (args_def.list[i].tag == tag_type)
+                type = args_def.list[i];
+            else if ((var_type = get_Variable(args_def.list[i])) && var_type->value.tag == tag_type)
+                type = var_type->value; // unwrap type
+            else
+            { // normal argument
+                TRY(args_def.list[i].tag == tag_symbole);
+    
+                have_a_type_hint = false; 
+                da_push(&g_ctx->stack, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
+                TRY(eval(li.list[arg_position++], &da_top(&g_ctx->stack).value));
+                continue;
+            }
         }
         
         if (have_a_type_hint) 
@@ -147,8 +146,8 @@ static inline bool prepare_function(da_Variable *new_frame, List *return_type, c
         }
         // normal type hint
         TRY(i > 0, error_log("type decoration goes after a symbole"));
-        da_top(new_frame).type = type;
-        TRY(is_of_type(da_top(new_frame).value, da_top(new_frame).type), error_log("bad argument type"));
+        da_top(&g_ctx->stack).type = type;
+        TRY(is_of_type(da_top(&g_ctx->stack).value, da_top(&g_ctx->stack).type), error_log("bad argument type"));
         have_a_type_hint = true;
     }
     return true;
@@ -165,41 +164,35 @@ bool eval_function(const List li, const List *function_def, List *out)
     const List args_def = func_def.list[0];
     TRY(args_def.tag == tag_list, error_log("argument definition is not a list got %s", tag_to_string(args_def.tag)));
     
-    List return_type = ANY_TYPE; 
-    da_Variable new_frame = {0};
-    TRY(prepare_function(&new_frame, &return_type, li, args_def));
-    da_push(&g_ctx->args_stack, new_frame);
+    push_stack_frame();
 
-    bool res = false;
+    List return_type = ANY_TYPE; 
+    TRY(prepare_function(&return_type, li, args_def), pop_stack_frame());
+
     // execute statements
     for (int i = 1; i+1 < func_def.size; i++)
-        if (!eval(func_def.list[i], out) && g_ctx->in_return)
-        { // return have been call
-            error.size = 0;         // reset error need to find solution for that
-            g_ctx->in_return = false; // not in return anymore
-            res = true;
-            goto end; // terminate
+        if (!eval(func_def.list[i], out))
+        {
+            if (g_ctx->in_return) // return have been call
+            {
+                error.size = 0;           // reset error need to find solution for that
+                g_ctx->in_return = false; // not in return anymore
+                pop_stack_frame();
+                return true; // terminate
+            }
+            return false; // true error
         }
     
     // return the last one
-    GOTRY(eval(func_def.list[func_def.size-1], out));
-    GOTRY(is_of_type(*out, return_type), error_log("function return unexpected type"));
-end:
-    res = true;
-fail:
-    assert(g_ctx->args_stack.size > 0);
-    TRY(g_ctx->args_stack.size > 0, error_log("return from root"));
-    da_free(&da_top(&g_ctx->args_stack));
-    g_ctx->args_stack.size--;
+    TRY(eval(func_def.list[func_def.size-1], out), pop_stack_frame());
+    TRY(is_of_type(*out, return_type), error_log("function return unexpected type"); pop_stack_frame());
     
-    return res;
+    return true;
 }
 
 
 bool eval(const List li, List *out)
 {
-    
-
     TRY(out, error_log("no output"));
     *out = NIL_LIST;
 
@@ -348,7 +341,6 @@ Lisp_context *Lisp_context_init(List root)
     Lisp_context *res = calloc(1, sizeof(*res));
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
-    da_push_zero(&res->args_stack);
 
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
@@ -373,12 +365,9 @@ void set_Lisp_context(Lisp_context *ctx)
 
 void Lisp_context_free(void)
 {
-    assert(g_ctx->args_stack.size >= 1);
-
     { // free memory not tracked by gc
-        da_for (da_Variable, it, &g_ctx->args_stack)
-            da_free(it);
-        da_free(&g_ctx->args_stack);
+        da_free(&g_ctx->stack);
+        
     
         set_Variable_free(&g_ctx->variables);
         g_ctx->root = NIL_LIST;

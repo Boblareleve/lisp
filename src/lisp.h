@@ -29,6 +29,7 @@ typedef enum List_tag : uint8_t
     tag_dynamic_lib,
     tag_foreign_function, // Foreign_fun
     ttag_any_type, // can only be use in type_tag fild of List 
+    ttag_frame, // to indicate the in a variable the value associated is a the index to the start of the previous frame
 } List_tag;
 
 
@@ -80,6 +81,7 @@ static_assert(sizeof(List) == 16);
 
 
 
+
 typedef struct Variable
 {
     List name;
@@ -103,12 +105,15 @@ typedef struct Lisp_context
     // set_Variable types;
 
     // stack (local)
-    da_da_Variable args_stack;
+    int frame_index; // index of the first element of the frame
+    da_Variable stack;
     bool in_return; // indicate that the error is only a return mechanism
 
     List root;
 
     set_void_ptr gc;
+
+    // da_List vm_stack;
     // Strb error;
 } Lisp_context;
 

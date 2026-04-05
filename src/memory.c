@@ -173,13 +173,10 @@ void gc_tag_context(void)
     gc_traverse_mark(g_ctx->root);
 
     // traverse stack
-    da_for (da_Variable, it, &g_ctx->args_stack)
+    da_for (Variable, it, &g_ctx->stack)
     {
-        da_for (Variable, jt, it)
-        {
-            gc_traverse_mark(jt->name);
-            gc_traverse_mark(jt->value);
-        }
+        gc_traverse_mark(it->name);
+        gc_traverse_mark(it->value);
     }
 
     // traverse globale variables

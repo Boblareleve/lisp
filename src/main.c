@@ -92,6 +92,7 @@ int main(int argc, char **argv)
         }
         
         fprintf(fd, "TEST %-*s\t", 48, argv[i]);
+        fflush(fd);
         if (!test(raw.view))
             fprintf(fd, "\tFAILURE\n");
         else

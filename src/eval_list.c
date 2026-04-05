@@ -234,7 +234,7 @@ static inline List typeof_List(List li)
     return res;
 }
 
-// if (List_equal_lit(op, "local")) // create and initilize a local variable
+// create and initilize a local variable
 bool primitive_local(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "local"));
@@ -250,7 +250,7 @@ bool primitive_local(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "tlocal")) // create and initilize a local variable
+// create and initilize a local variable
 bool primitive_tlocal(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "tlocal"));
@@ -273,7 +273,7 @@ bool primitive_tlocal(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "global")) // create and initilize a global variable
+// create and initilize a global variable
 bool primitive_global(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "global"));
@@ -292,7 +292,7 @@ bool primitive_global(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "defun")) // same as global but don't eval argument 
+// same as global but don't eval argument 
 bool primitive_defun(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "defun"));
@@ -312,7 +312,21 @@ bool primitive_defun(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "=")) // change value of a variable
+
+// false on not found
+bool mutate_Variable(Variable var)
+{
+    Variable *old = get_Variable(var.name);
+    if (old)
+    {
+        TRY(is_of_type(var.value, old->type), error_log("mutate value in stack to a value of an unexpected type"));
+        old->value = var.value;
+        return true;
+    }
+    return false;
+}
+
+// change value of a variable
 bool primitive_assign(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "="));
@@ -373,8 +387,6 @@ bool primitive_assign(const List li, List *out)
 }
  */
 
-
- // if (List_equal_lit(op, "[]"))
 bool primitive_square_bracket(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "[]"));
@@ -401,7 +413,6 @@ bool primitive_square_bracket(const List li, List *out)
         out->size = i_index_h - i_index_l; // [] '(1 2 3) 1 2 -> .size = 1  
         out->offset += i_index_l;          //                 -> offset+1
         out->list   += i_index_l;          //                 -> ptr + 1
-        // printf("->> [%d:%d] %d %d\n", i_index_l, i_index_h, out->size, out->offset);
         return true;
     }
     
@@ -413,7 +424,6 @@ bool primitive_square_bracket(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "copy"))
 bool primitive_copy(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "copy"));
@@ -425,7 +435,6 @@ bool primitive_copy(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "?"))
 bool primitive_exclamation_mark(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "?"));
@@ -435,7 +444,6 @@ bool primitive_exclamation_mark(const List li, List *out)
     return eval(li.list[(!IS_NIL(cond)) ? 2 : 3], out);
 }
 
-// if (List_equal_lit(op, "if"))
 bool primitive_if(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "if"));
@@ -447,7 +455,6 @@ bool primitive_if(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "print"))
 bool primitive_print(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "print"));
@@ -463,7 +470,6 @@ bool primitive_print(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "while"))
 bool primitive_while(const List li, List *out)
 { // return last value of the body and of the last iteration or () if no body
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "while"));
@@ -481,8 +487,6 @@ bool primitive_while(const List li, List *out)
     }
     return true;
 }
-
-// if (List_equal_lit(op, "return"))
 bool primitive_return(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "return"));
@@ -494,7 +498,6 @@ bool primitive_return(const List li, List *out)
     return false;
 }
 
-// if (List_equal_lit(op, "+"))
 bool primitive_plus(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "+"));
@@ -513,7 +516,6 @@ bool primitive_plus(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "++"))
 bool primitive_increment(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "++"));
@@ -528,7 +530,6 @@ bool primitive_increment(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "--"))
 bool primitive_decrement(const List li, List *out)
 {
     // EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "--"));
@@ -543,7 +544,6 @@ bool primitive_decrement(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "-"))
 bool primitive_minus(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "-"));
@@ -563,7 +563,6 @@ bool primitive_minus(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "*"))
 bool primitive_product(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "*"));
@@ -581,7 +580,6 @@ bool primitive_product(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "/"))
 bool primitive_div(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "/"));
@@ -599,7 +597,6 @@ bool primitive_div(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "//"))
 bool primitive_integer_div(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "//"));
@@ -617,7 +614,6 @@ bool primitive_integer_div(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "=="))
 bool primitive_equal(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "=="));
@@ -639,7 +635,6 @@ bool primitive_equal(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "<="))
 bool primitive_less_or_equal_than(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<="));
@@ -657,7 +652,6 @@ bool primitive_less_or_equal_than(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, ">="))
 bool primitive_more_or_equal_than(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">="));
@@ -675,7 +669,6 @@ bool primitive_more_or_equal_than(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, ">"))
 bool primitive_more_than(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">"));
@@ -693,7 +686,6 @@ bool primitive_more_than(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "<"))
 bool primitive_less_than(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<"));
@@ -711,7 +703,6 @@ bool primitive_less_than(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "!="))
 bool primitive_not_equal(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!="));
@@ -732,7 +723,6 @@ bool primitive_not_equal(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "!"))
 bool primitive_not(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!"));
@@ -745,7 +735,6 @@ bool primitive_not(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "&&"))
 bool primitive_and(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "&&"));
@@ -763,7 +752,6 @@ bool primitive_and(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "||"))
 bool primitive_or(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "||"));
@@ -783,7 +771,6 @@ bool primitive_or(const List li, List *out)
     return true; // out is already set to nil (false)
 }
 
-// if (List_equal_lit(op, "first"))
 bool primitive_first(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "first"));
@@ -796,7 +783,6 @@ bool primitive_first(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "next"))
 bool primitive_next(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "next"));
@@ -822,16 +808,15 @@ bool primitive_next(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "for"))
 bool primitive_for(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "for"));
     TRY(li.size >= 4, error_log("expected 4 elements for 'for' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole);
+    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole for the iterator name got %s", tag_to_string(li.list[1].tag)));
     
     List iterable = {0};
     TRY(eval(li.list[2], &iterable));
-    TRY(iterable.tag == tag_list);
+    TRY(iterable.tag == tag_list, error_log("expected a list to iterate in for loop got %s", tag_to_string(iterable.tag)));
     // TYPED optionnal
     size_t it_idx = local_Variable((Variable){ 
         .name = li.list[1], 
@@ -842,20 +827,18 @@ bool primitive_for(const List li, List *out)
         .type = ANY_TYPE
     });
 
-    size_t frame_idx = g_ctx->args_stack.size - 1;
     for (int i = 0; i < iterable.size; i++)
     {
-        assert(g_ctx->args_stack.arr[frame_idx].arr[it_idx].value.list);
-        *g_ctx->args_stack.arr[frame_idx].arr[it_idx].value.list = iterable.list[i];
+        TRY(g_ctx->stack.arr[it_idx].value.list);
+        *g_ctx->stack.arr[it_idx].value.list = iterable.list[i];
         
         for (int j = 3; j < li.size; j++)
-            TRY(eval(li.list[j], out));
+            TRY(eval(li.list[j], out), error_log("while evaluating for loop body"));
     }
     
     return true;
 }
 
-// if (List_equal_lit(op, "format"))
 bool primitive_format(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "format"));
@@ -879,7 +862,6 @@ bool primitive_format(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "quote"))
 bool primitive_quote(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "quote"));
@@ -889,7 +871,6 @@ bool primitive_quote(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "typeof"))
 bool primitive_typeof(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "typeof"));
@@ -899,7 +880,6 @@ bool primitive_typeof(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "eval"))
 bool primitive_eval(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "eval"));
@@ -915,7 +895,6 @@ bool primitive_eval(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "type"))
 bool primitive_type(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "type"));
@@ -936,7 +915,6 @@ bool primitive_type(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "len"))
 bool primitive_len(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "len"));
@@ -953,7 +931,6 @@ bool primitive_len(const List li, List *out)
     return true;
 }
 
-// if (List_equal_lit(op, "$"))
 bool primitive_dollar(const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "$"));
@@ -997,7 +974,6 @@ bool primitive_array(const List li, List *out)
     List count = {0};
     TRY(eval(li.list[1], &count));
     TRY(count.tag == tag_integer);
-    // printf("--array> %ld\n", count.integer);
     
     *out = (List){
         .tag = tag_list,
@@ -1012,8 +988,7 @@ bool primitive_reference(const List li, List *out)
     EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "reference"));
 
     TRY(li.size == 2, error_log("expected 2 elements for 'reference' got %d", li.size));
-    // List ref = {0};
-    // TRY(eval(li.list[1], ));
+
     *out = (List){
         .tag = tag_reference,
         .list = List_duplicate(&li.list[1], sizeof(li.list[1]))
@@ -1424,11 +1399,11 @@ int _main(void)
     // s2231: c2 a55 fun0
     // if (0)
     // {
-    //     da_int slots = {0};
-    //     da_push_nzeros(&slots, 55);
-    //     printf("-> %d\n", count_for_strategie(2231, 0, &slots, true));
+        // da_int slots = {0};
+        // da_push_nzeros(&slots, 55);
+        // printf("-> %d\n", count_for_strategie(2231, 0, &slots, true));
     // }
     // else
-    //     search_seed();
+        // search_seed();
     return 0;
 }

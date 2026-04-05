@@ -24,9 +24,9 @@
 ;;     ([] arr ([] 1 obj) element)
 ;; ))
 
-(defun da_len ((obj list)
-    ([] obj 1)
-))
+;; (defun da_len ((obj list)
+;;     ([] obj 1)
+;; ))
 
 ;; (defun da_slice ((obj list)
 ;;     ([] ([] 0 obj) 0 (da_len obj))
@@ -37,7 +37,7 @@
 ;; ))
 
 
-(local da (da_make 10))
+;; (local da (da_make 10))
 
 ;; (print da)
 
