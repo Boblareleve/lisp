@@ -172,7 +172,11 @@ void gc_tag_context(void)
     // traverse code
     gc_traverse_mark(g_ctx->root);
 
-    // traverse stack
+    // traverse vm stack
+    da_for (List, it, &g_ctx->vm_stack)
+        gc_traverse_mark(*it);
+    
+    // traverse stack ("named")
     da_for (Variable, it, &g_ctx->stack)
     {
         gc_traverse_mark(it->name);

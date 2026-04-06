@@ -152,77 +152,77 @@ static inline List idiv_List(List a, List b)
     }
     return NIL_LIST;
 }
-static inline List le_than_List(List a, List b)
+static inline bool le_than_List(List a, List b)
 {
     if (a.tag == tag_integer)
     {
         if (b.tag == tag_integer)
-            return a.integer <= b.integer ? TRUE_LIST : NIL_LIST;
+            return a.integer <= b.integer;
         else if (b.tag == tag_real)
-            return a.integer <= b.real ? TRUE_LIST : NIL_LIST;
+            return a.integer <= b.real;
     }
     else if (a.tag == tag_real)
     {
         if (b.tag == tag_integer)
-            return a.real <= b.integer ? TRUE_LIST : NIL_LIST;
+            return a.real <= b.integer;
         else if (b.tag == tag_real)
-            return a.real <= b.real ? TRUE_LIST : NIL_LIST;
+            return a.real <= b.real;
     }
-    return NIL_LIST;
+    return false;
 }
-static inline List ge_than_List(List a, List b)
+static inline bool ge_than_List(List a, List b)
 {
     if (a.tag == tag_integer)
     {
         if (b.tag == tag_integer)
-            return a.integer >= b.integer ? TRUE_LIST : NIL_LIST;
+            return a.integer >= b.integer;
         else if (b.tag == tag_real)
-            return a.integer >= b.real ? TRUE_LIST : NIL_LIST;
+            return a.integer >= b.real;
     }
     else if (a.tag == tag_real)
     {
         if (b.tag == tag_integer)
-            return a.real >= b.integer ? TRUE_LIST : NIL_LIST;
+            return a.real >= b.integer;
         else if (b.tag == tag_real)
-            return a.real >= b.real ? TRUE_LIST : NIL_LIST;
+            return a.real >= b.real;
     }
-    return NIL_LIST;
+    return false;
 }
-static inline List l_than_List(List a, List b)
+static inline bool l_than_List(List a, List b)
 {
     if (a.tag == tag_integer)
     {
         if (b.tag == tag_integer)
-            return a.integer < b.integer ? TRUE_LIST : NIL_LIST;
+            return a.integer < b.integer;
         else if (b.tag == tag_real)
-            return a.integer < b.real ? TRUE_LIST : NIL_LIST;
+            return a.integer < b.real;
     }
     else if (a.tag == tag_real)
     {
         if (b.tag == tag_integer)
-            return a.real < b.integer ? TRUE_LIST : NIL_LIST;
+            return a.real < b.integer;
         else if (b.tag == tag_real)
-            return a.real < b.real ? TRUE_LIST : NIL_LIST;       
+            return a.real < b.real;
     }
-    return NIL_LIST;
+    return false;
 }
-static inline List g_than_List(List a, List b)
+static inline bool g_than_List(List a, List b)
 {
     if (a.tag == tag_integer)
     {
         if (b.tag == tag_integer)
-            return a.integer > b.integer ? TRUE_LIST : NIL_LIST;
+            return a.integer > b.integer;
         else if (b.tag == tag_real)
-            return a.integer > b.real ? TRUE_LIST : NIL_LIST;
+            return a.integer > b.real;
     }
     else if (a.tag == tag_real)
     {
         if (b.tag == tag_integer)
-            return a.real > b.integer ? TRUE_LIST : NIL_LIST;
+            return a.real > b.integer;
         else if (b.tag == tag_real)
-            return a.real > b.real ? TRUE_LIST : NIL_LIST;
+            return a.real > b.real;
     }
-    return NIL_LIST;
+    return false;
 }
 static inline List typeof_List(List li)
 {
@@ -234,84 +234,88 @@ static inline List typeof_List(List li)
     return res;
 }
 
-// create and initilize a local variable
-bool primitive_local(const List li, List *out)
+// create and initilize a local variable -> return is undefined
+bool primitive_local(void) // const List li, List *out)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "local"));
-    UNUSED(out);
-    TRY(li.size == 3, error_log("expected 3 element for 'local' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(li.list[1].tag)));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
+    TRY(VM_top1.size == 3, error_log("expected 3 element for 'local' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
     
-    Variable var = { .name = li.list[1], .type = ANY_TYPE };
-    TRY(eval(li.list[2], &var.value));
-
-    local_Variable(var);
-
+    VM_push(VM_top1.list[2]);
+    TRY(eval());
+    
+    local_Variable((Variable){
+        .name = VM_top2.list[1],
+        .type = ANY_TYPE,
+        .value = VM_top1
+    });
+    VM_pop;
     return true;
 }
 
-// create and initilize a local variable
-bool primitive_tlocal(const List li, List *out)
+// create and initilize a typed local variable -> return is undefined
+bool primitive_tlocal(void) // const List li, List *out)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "tlocal"));
-    UNUSED(out);
-    TRY(li.size == 4, error_log("expected 4 element for 'tlocal' (type local) got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
+    TRY(VM_top1.size == 4, error_log("expected 3 element for 'local' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
 
-    const List name = li.list[1];
-    TRY(name.tag == tag_symbole, error_log("expected a symbole in 'tlocal' to got %s", tag_to_string(li.list[1].tag)));
+    VM_push(VM_top1.list[2]);
+    TRY(eval());
+
+    VM_rotate;
     
-    List type = {0};
-    TRY(eval(li.list[2], &type));
-    TRY(type.tag == tag_type, error_log("expected a type in 'tlocal' got %s", tag_to_string(type.tag)));
-
-    Variable var = { .name = name, .type = type };
-    TRY(eval(li.list[3], &var.value));
-    TRY(is_of_type(var.value, var.type), error_log("set value in 'tlocal' is not in the expected type"));
-
-    local_Variable(var);
-
+    VM_push(VM_top1.list[3]);
+    TRY(eval());
+    
+    local_Variable((Variable){ 
+        .name = VM_top2.list[1],
+        .type = VM_top1,
+        .value = VM_top3
+    });
+    VM_pop;
+    VM_pop;
     return true;
 }
 
 // create and initilize a global variable
-bool primitive_global(const List li, List *out)
+bool primitive_global(void) // const List li, List *out)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "global"));
-    UNUSED(out);
-    TRY(li.size == 3, error_log("expected 3 element for 'global' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to 'global' to got %s", tag_to_string(li.list[1].tag)));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "global"));
+    // UNUSED(out);
+    TRY(VM_top1.size == 3, error_log("expected 3 element for 'global' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'global' to got %s", tag_to_string(VM_top1.list[1].tag)));
 
-    Variable var = { 
-        .name = li.list[1], 
-        .type = ANY_TYPE
+    VM_push(VM_top1.list[2]);
+    TRY(eval());
+    
+    Variable var = {
+        .name = VM_top2.list[1], 
+        .type = ANY_TYPE,
+        .value = VM_top1
     };
-    TRY(eval(li.list[2], &var.value));
-
     TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
     
     return true;
 }
 
 // same as global but don't eval argument 
-bool primitive_defun(const List li, List *out)
+bool primitive_defun(void) // const List li, List *out)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "defun"));
-    UNUSED(out);
-    TRY(li.size == 3, error_log("expected 3 element for 'defun' got %d elements", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole to 'defun' to got %s", tag_to_string(li.list[1].tag)));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "defun"));
+    TRY(VM_top1.size == 3, error_log("expected 3 element for 'defun' got %d elements", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'defun' to got %s", tag_to_string(VM_top1.list[1].tag)));
 
     Variable var = {
-        .name = li.list[1],
-        .value = li.list[2],
+        .name = VM_top1.list[1],
+        .value = VM_top1.list[2],
         .type = ANY_TYPE
     };
-
     // set or replace function var.name
     TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
     
     return true;
 }
-
 
 // false on not found
 bool mutate_Variable(Variable var)
@@ -327,499 +331,592 @@ bool mutate_Variable(Variable var)
 }
 
 // change value of a variable
-bool primitive_assign(const List li, List *out)
+bool primitive_assign(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "="));
-    UNUSED(out);
-    TRY(li.size == 3, error_log("expected 3 element for '=' got %d", li.size));
-    if (li.list[1].tag == tag_symbole)
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "="));
+    TRY(VM_top1.size == 3, error_log("expected 3 element for '=' got %d", VM_top1.size));
+
+    if (VM_top1.list[1].tag == tag_symbole)
     {
-        Variable var = { .name = li.list[1], .type = ANY_TYPE };
-        TRY(eval(li.list[2], &var.value));
-        if (var.value.tag == tag_reference)
+        VM_push(VM_top1.list[2]);
+        TRY(eval());
         {
-            assert(var.value.list);
-            TRY(eval(li.list[2], var.value.list));
-            return true;
+            Variable *var = get_Variable(VM_top2.list[1]);
+            TRY(var, error_log("left is a symbole (%.*s) but there is no variable with this name", VM_top2.list[1].size, VM_top2.list[1].str));
+            if (var->value.tag == tag_reference)
+                *var->value.list = VM_top1; // need a way to change a reference in a variable
+            else
+                var->value = VM_top1;
         }
-        TRY(mutate_Variable(var));
+
+        // TODO
+        // TRY(is_of_type(VM_top1, VM_top2.list[]))
+
         return true;
     }
 
-    List left = li.list[1];
-    if (left.tag != tag_reference)
-        TRY(eval(left, &left));
+    // List left = li.list[1];
+    VM_push(VM_top1.list[1]);
+    if (VM_top1.tag != tag_reference)
+        TRY(eval());
 
-    if (left.tag == tag_reference)
+    
+    if (VM_top1.tag == tag_reference)
     {
-        assert(left.list);
-        TRY(eval(li.list[2], left.list));
+        VM_push(VM_top2.list[2]);
+        TRY(eval());
+        *VM_top2.list = VM_top1;
+        VM_top3 = VM_top1;
+        VM_pop;
+        VM_pop;
         return true;
     }
-
-    error_log("expected a symbole or a reference to set to got %s", tag_to_string(li.list[1].tag));
+    VM_pop;
+    error_log("expected a symbole or a reference to set to got %s", tag_to_string(VM_top1.list[1].tag));
     return false;
 }
 
-// if (List_equal_lit(op, "[]="))
-/* bool primitive_bracket_assign(const List li, List *out)
+bool primitive_square_bracket(void)
 {
-    UNUSED(out);
-    TRY(li.size == 4, error_log("expected 4 element list for []= got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "[]"));
+    TRY(VM_top1.size == 3 || VM_top1.size == 4, error_log("expected 3 or 4 element for '[]' got %d", VM_top1.size));
     
-    List list = {0};
-    TRY(eval(li.list[1], &list));
-    TRY(list.tag == tag_list, error_log("expected a list to index %s", tag_to_string(list.tag)));
-    
-    List index_l = {0};
-    TRY(eval(li.list[2], &index_l));
-    TRY(index_l.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_l.tag)));
-    int i_index_l = index_l.integer;
-    TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
-    
-    List res = {0};
-    TRY(eval(li.list[3], &res));
-    list.list[i_index_l] = res;
-    return true;
+    // List list = {0};
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list, error_log("expected a list to index got %s", tag_to_string(VM_top1.tag)));
 
-    // TODO: pack unpack (py)->  [a, b] = [1, 2][:]
-    // ([]= '(a b c) 0 3 '(A B C))
-}
- */
-
-bool primitive_square_bracket(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "[]"));
-    TRY(li.size == 3 || li.size == 4, error_log("expected 3 or 4 element for '[]' got %d", li.size));
     
-    List list = {0};
-    TRY(eval(li.list[1], &list));
-    TRY(list.tag == tag_list, error_log("expected a list to index %s", tag_to_string(list.tag)));
-    
-    List index_l = {0};
-    TRY(eval(li.list[2], &index_l));
-    TRY(index_l.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_l.tag)));
-    int i_index_l = index_l.integer;
-    TRY(0 <= i_index_l && i_index_l < list.size, error_log("out of bounds %d is not range of list of size %d", i_index_l, list.size));
+    // List index_l = {0};
+    // int i_index_l = index_l.integer;
+    VM_push(VM_top2.list[2]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
+    TRY(0 <= VM_top1.integer && VM_top1.integer < VM_top2.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top2.size));
 
-    List index_h = {0};
-    if (li.size == 4)
+    // List index_h = {0};
+    // int i_index_h = index_h.integer;
+    if (VM_top3.size == 4)
     {
-        TRY(eval(li.list[3], &index_h));
-        TRY(index_h.tag == tag_integer, error_log("expected an index %s", tag_to_string(index_h.tag)));
-        int i_index_h = index_h.integer;
-        TRY(i_index_l < i_index_h && i_index_h <= list.size, error_log("out of bounds %d is not range of list of size %d", i_index_h, list.size));
-        *out = list;
-        out->size = i_index_h - i_index_l; // [] '(1 2 3) 1 2 -> .size = 1  
-        out->offset += i_index_l;          //                 -> offset+1
-        out->list   += i_index_l;          //                 -> ptr + 1
+        VM_push(VM_top3.list[3]);
+        TRY(eval());
+        TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
+        TRY(VM_top2.integer < VM_top1.integer && VM_top1.integer <= VM_top3.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top3.size));
+
+        VM_top4 = VM_top3;
+        VM_top4.size = VM_top1.integer - VM_top2.integer; // [] '(1 2 3) 1 2 -> .size = 1  
+        VM_top4.offset += VM_top2.integer;                //                 -> offset+1
+        VM_top4.list   += VM_top2.integer;                //                 -> ptr + 1
+        
+        VM_pop; VM_pop; VM_pop;
         return true;
     }
     
-    *out = (List){
+    VM_top3 = (List){
         .tag = tag_reference,
-        .list = &list.list[i_index_l],
-        .offset = i_index_l
+        .list = &VM_top2.list[VM_top1.integer],
+        .offset = VM_top1.integer
     };
+    
+    VM_pop; VM_pop;
     return true;
 }
 
-bool primitive_copy(const List li, List *out)
+bool primitive_copy(void) // const List li, List *out)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "copy"));
-    TRY(li.size == 2, error_log("expected 2 argument for 'copy' got %d elements", li.size));
-
-    List to_copy = {0};
-    TRY(eval(li.list[1], &to_copy));
-    *out = List_copy(to_copy);
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "copy"));
+    TRY(VM_top1.size == 2, error_log("expected 2 argument for 'copy' got %d elements", VM_top1.size));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    VM_top1 = List_copy(VM_top1);
     return true;
 }
 
-bool primitive_exclamation_mark(const List li, List *out)
+bool primitive_exclamation_mark(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "?"));
-    TRY(li.size == 4, error_log("expected 4 element for '?' got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "?"));
+    TRY(VM_top1.size == 4, error_log("expected 4 element for '?' got %d", VM_top1.size));
     List cond = {0};
-    TRY(eval(li.list[1], &cond));
-    return eval(li.list[(!IS_NIL(cond)) ? 2 : 3], out);
-}
-
-bool primitive_if(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "if"));
-    TRY(li.size == 3, error_log("expected 3 element for 'if' got %d", li.size));
-    List cond = {0};
-    TRY(eval(li.list[1], &cond));
-    if (!IS_NIL(cond))
-        return eval(li.list[2], out);
-    return true;
-}
-
-bool primitive_print(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "print"));
-    UNUSED(out);
-    TRY(li.size >= 2, error_log("expected at least 2 elements for 'print' got %d", li.size));
-
-    for (int i = 1; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    
+    if (!IS_NIL(VM_top1))
     {
-        List li_to_print = {0};
-        TRY(eval(li.list[i], &li_to_print), error_log("failed to eval to 'print'"));
-        TRY(List_print(li_to_print), error_log("failed to print"));
+        VM_pop;
+        VM_top1 = VM_top1.list[2];
+        TRY(eval());
+    }
+    else
+    {
+        VM_pop;
+        VM_top1 = VM_top1.list[3];
+        TRY(eval());
     }
     return true;
 }
 
-bool primitive_while(const List li, List *out)
+bool primitive_if(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "if"));
+    TRY(VM_top1.size == 3, error_log("expected 3 element for 'if' got %d", VM_top1.size));
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    if (!IS_NIL(VM_top1))
+    {
+        VM_pop;
+        VM_top1 = VM_top1.list[2];
+        return eval();
+    }
+    VM_pop;
+    return true;
+}
+
+bool primitive_print(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "print"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'print' got %d", VM_top1.size));
+
+    VM_push(NIL_LIST);
+    for (int i = 1; i < VM_top2.size; i++)
+    {
+        VM_top1 = VM_top2.list[i];
+        TRY(eval(), error_log("failed to eval to 'print'"));
+        TRY(List_print(VM_top1), error_log("failed to print"));
+    }
+    VM_pop;
+    return true;
+}
+
+bool primitive_while(void)
 { // return last value of the body and of the last iteration or () if no body
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "while"));
-    TRY(li.size >= 2, error_log("expected at least 2 elements for 'while' got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "while"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'while' got %d", VM_top1.size));
+
+    VM_push(NIL_LIST);
     for (;;)
     {
         // the condition can have side effects
-        List cond = {0};
-        TRY(eval(li.list[1], &cond));
-        
-        if (IS_NIL(cond))
+        VM_push(VM_top2.list[1]);
+        TRY(eval());
+        if (IS_NIL(VM_top1))
+        {
+            VM_pop;
             break;
-        for (int i = 2; i < li.size; i++)
-            TRY(eval(li.list[i], out));
+        }
+        VM_pop;
+
+
+        for (int i = 2; i < VM_top2.size; i++)
+        {
+            VM_top1 = VM_top2.list[i];
+            TRY(eval());
+        }
     }
     return true;
 }
-bool primitive_return(const List li, List *out)
+
+bool primitive_return(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "return"));
-    TRY(li.size == 1 || li.size == 2, error_log("expected 2 or 3 elements for 'return' got %d", li.size));
-    if (li.size == 2)
-        TRY(eval(li.list[1], out));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "return"));
+    TRY(VM_top1.size == 1 || VM_top1.size == 2, error_log("expected 2 or 3 elements for 'return' got %d", VM_top1.size));
+    if (VM_top1.size == 2)
+    {
+        VM_top1 = VM_top1.list[1];
+        TRY(eval());
+    }
+    else
+        VM_top1 = NIL_LIST;
     
     g_ctx->in_return = true;
     return false;
 }
 
-bool primitive_plus(const List li, List *out)
+bool primitive_plus(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "+"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '+' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "+"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '+' got %d", VM_top1.size));
 
-    for (int i = 2; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        List operand = {0};
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
-        TRY(eval(li.list[i], &operand));
-        TRY((res = add_List(res, operand)).tag != tag_list);
+        VM_top2 = add_List(VM_top2, VM_top1);
+        TRY(!IS_NIL(VM_top2));
+        VM_pop;
     }
-    *out = res;
     return true;
 }
 
-bool primitive_increment(const List li, List *out)
+bool primitive_increment(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "++"));
-    TRY(li.size == 2, error_log("expected 2 elements for '++' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("can only increment variable got %s", tag_to_string(li.list[1].tag)));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "++"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for '++' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("can only increment variable got %s", tag_to_string(VM_top1.list[1].tag)));
     
-    Variable *to_inc = get_Variable(li.list[1]);
-    TRY(to_inc, error_log("variable \"%.*s\" to increment not found", li.list[1].size, li.list[1].str));
+    Variable *to_inc = get_Variable(VM_top1.list[1]);
+    TRY(to_inc, error_log("variable \"%.*s\" to increment not found", VM_top1.list[1].size, VM_top1.list[1].str));
     TRY(to_inc->value.tag == tag_integer, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
     to_inc->value.integer += 1;
-    *out = to_inc->value;
+    VM_top1 = to_inc->value;
     return true;
 }
 
-bool primitive_decrement(const List li, List *out)
+bool primitive_decrement(void)
 {
-    // EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "--"));
-    TRY(li.size == 2, error_log("expected 2 elements for '==' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("can only decrement variable got %s", tag_to_string(li.list[1].tag)));
-    
-    Variable *to_dec = get_Variable(li.list[1]);
-    TRY(to_dec, error_log("variable \"%.*s\" to decrement not found", li.list[1].size, li.list[1].str));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "--"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for '==' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("can only decrement variable got %s", tag_to_string(VM_top1.list[1].tag)));
+
+    Variable *to_dec = get_Variable(VM_top1.list[1]);
+    TRY(to_dec, error_log("variable \"%.*s\" to decrement not found", VM_top1.list[1].size, VM_top1.list[1].str));
     TRY(to_dec->value.tag == tag_integer, error_log("try to decrement %s", tag_to_string(to_dec->value.tag)));
     to_dec->value.integer -= 1;
-    *out = to_dec->value;
+    VM_top1 = to_dec->value;
     return true;
 }
 
-bool primitive_minus(const List li, List *out)
+bool primitive_minus(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "-"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '-' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-    TRY(res.tag == tag_integer);
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "-"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '-' got %d", VM_top1.size));
 
-    for (int i = 2; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        List operand = {0};
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
-        TRY(eval(li.list[i], &operand));
-        TRY((res = sub_List(res, operand)).tag != tag_list, error_log("expected a number to subtruct got %s", tag_to_string(operand.tag)));
+        VM_top2 = sub_List(VM_top2, VM_top1);
+        TRY(!IS_NIL(VM_top2));
+        VM_pop;
     }
-    *out = res;
     return true;
 }
 
-bool primitive_product(const List li, List *out)
+bool primitive_product(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "*"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '*' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "*"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '*' got %d", VM_top1.size));
 
-    for (int i = 2; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = mult_List(res, operand)).tag != tag_list, error_log("expected a number to multiply got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_div(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "/"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '/' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = div_List(res, operand)).tag != tag_list, error_log("expected a number to divide got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_integer_div(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "//"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '//' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = idiv_List(res, operand)).tag != tag_list, error_log("expected a number to divide integer got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_equal(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "=="));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '==' got %d", li.size));
-    
-    List acc = {0};
-    TRY(eval(li.list[1], &acc));
-    
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
-        if (!List_equal(acc, operand))
-            return true; // out is already set to nil 
+        VM_top2 = mult_List(VM_top2, VM_top1);
+        TRY(!IS_NIL(VM_top2));
+        VM_pop;
+    }
+    return true;
+}
+
+bool primitive_div(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "/"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '/' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
+        VM_top2 = div_List(VM_top2, VM_top1);
+        TRY(!IS_NIL(VM_top2));
+        VM_pop;
     }
-    *out = TRUE_LIST;
     return true;
 }
 
-bool primitive_less_or_equal_than(const List li, List *out)
+bool primitive_integer_div(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<="));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '<=' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "//"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '//' got %d", VM_top1.size));
 
-    for (int i = 2; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = le_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_more_or_equal_than(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">="));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '>=' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = ge_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_more_than(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], ">"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '>' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = g_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_less_than(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "<"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '<' got %d", li.size));
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        TRY((res = l_than_List(res, operand)).tag != tag_list, error_log("expected a number to compare got %s", tag_to_string(operand.tag)));
-    }
-    *out = res;
-    return true;
-}
-
-bool primitive_not_equal(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!="));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '!=' got %d", li.size));
-    
-    List acc = {0};
-    TRY(eval(li.list[1], &acc));
-    
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
-        if (List_equal(acc, operand))
-            return true; // out is already set to nil 
+        VM_top2 = idiv_List(VM_top2, VM_top1);
+        TRY(!IS_NIL(VM_top2));
+        VM_pop;
     }
-    *out = TRUE_LIST;
     return true;
 }
 
-bool primitive_not(const List li, List *out)
+bool primitive_equal(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "!"));
-    TRY(li.size >= 2, error_log("expected at least 2 elements for '==' got %d", li.size));
-    
-    List res = {0};
-    TRY(eval(li.list[1], &res));
-    if (IS_NIL(res))
-        *out = TRUE_LIST;
-    return true;
-}
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "=="));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '==' got %d", VM_top1.size));
 
-bool primitive_and(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "&&"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '&&' got %d", li.size));
-    
-    for (int i = 1; i < li.size; i++)
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
         
-        if (IS_NIL(operand))
-            return true; // out is already set to nil (false)
-    }
-    *out = TRUE_LIST;
-    return true;
-}
-
-bool primitive_or(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "||"));
-    TRY(li.size >= 3, error_log("expected at least 3 elements for '||' got %d", li.size));
-    
-    for (int i = 2; i < li.size; i++)
-    {
-        List operand = {0};
-        TRY(eval(li.list[i], &operand));
-        
-        if (!IS_NIL(operand))
+        if (!List_equal(VM_top2, VM_top1))
         {
-            *out = TRUE_LIST;
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
             return true;
         }
+        VM_pop;
     }
-    return true; // out is already set to nil (false)
-}
-
-bool primitive_first(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "first"));
-    TRY(li.size == 2, error_log("expected 2 elements for 'first' got %d", li.size));
-    TRY(eval(li.list[1], out),  *out = NIL_LIST);
-    TRY(out->tag == tag_list,        *out = NIL_LIST);
-    TRY(out->size > 0,               *out = NIL_LIST; error_log("can't take first element of an empty list"));
-    
-    *out = out->list[0];
     return true;
 }
 
-bool primitive_next(const List li, List *out)
+bool primitive_less_or_equal_than(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "next"));
-    TRY(li.size == 2, error_log("expected 2 elements for 'next' got %d", li.size));
-    TRY(eval(li.list[1], out));
-    TRY(out->tag == tag_list, *out = NIL_LIST);
-    
-    if (out->quote_count > 0)
-    { // (next (quote (a b))) -> (a b)
-        out->quote_count--;
-    }
-    else if (out->size > 1)
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "<="));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '<=' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
     {
-        *out = (List){
-            .tag = tag_list,
-            .offset = out->offset + 1,
-            .size = out->size - 1,
-            .list = &out->list[1]
-        };
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
+        
+        if (!le_than_List(VM_top2, VM_top1))
+        {
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
     }
-    else
-        *out = NIL_LIST;
     return true;
 }
 
-bool primitive_for(const List li, List *out)
+bool primitive_more_or_equal_than(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "for"));
-    TRY(li.size >= 4, error_log("expected 4 elements for 'for' got %d", li.size));
-    TRY(li.list[1].tag == tag_symbole, error_log("expected a symbole for the iterator name got %s", tag_to_string(li.list[1].tag)));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], ">="));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '>=' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
+        
+        if (!ge_than_List(VM_top2, VM_top1))
+        {
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    return true;
+}
+
+bool primitive_more_than(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], ">"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '>' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
+        
+        if (!g_than_List(VM_top2, VM_top1))
+        {
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    return true;
+}
+
+bool primitive_less_than(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "<"));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '<' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
+        
+        if (!l_than_List(VM_top2, VM_top1))
+        {
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    return true;
+}
+
+bool primitive_not_equal(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "!="));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 elements for '!=' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+
+    for (int i = 2; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top2.list[i]);
+        TRY(eval());
+
+        if (List_equal(VM_top2, VM_top1))
+        {
+            VM_pop;
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    return true;
+}
+
+bool primitive_not(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "!"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for '!' got %d", VM_top1.size));
     
-    List iterable = {0};
-    TRY(eval(li.list[2], &iterable));
-    TRY(iterable.tag == tag_list, error_log("expected a list to iterate in for loop got %s", tag_to_string(iterable.tag)));
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    VM_top1 = IS_NIL(VM_top1) ? TRUE_LIST : NIL_LIST;
+
+    return true;
+}
+
+bool primitive_and(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "&&"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for '&&' got %d", VM_top1.size));
+
+    for (int i = 1; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top1.list[i]);
+        TRY(eval());
+        
+        if (IS_NIL(VM_top1))
+        {
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    VM_top1 = TRUE_LIST;
+    return true;
+}
+
+bool primitive_or(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "||"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for '||' got %d", VM_top1.size));
+
+    for (int i = 1; i < VM_top2.size; i++)
+    {
+        VM_push(VM_top1.list[i]);
+        TRY(eval());
+        
+        if (!IS_NIL(VM_top1))
+        {
+            VM_pop;
+            VM_top1 = NIL_LIST;
+            return true;
+        }
+        VM_pop;
+    }
+    VM_top1 = TRUE_LIST;
+    return true;
+}
+
+bool primitive_first(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "first"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'first' got %d", VM_top1.size));
+
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list);
+    TRY(VM_top1.size > 0, error_log("can't take first element of an empty list"));
+    
+    VM_top1 = VM_top1.list[0];
+    return true;
+}
+
+bool primitive_next(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "next"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'next' got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    if (VM_top1.quote_count > 0)
+    {
+        VM_top1.quote_count--;
+        return true;
+    }
+
+    TRY(VM_top1.tag == tag_list);
+
+    VM_top2 = (VM_top1.size <= 1) ? NIL_LIST : (List){
+        .tag = tag_list,
+        .offset = VM_top2.offset + 1,
+        .size = VM_top1.size - 1,
+        .list = &VM_top2.list[1]
+    };
+    VM_pop;
+
+    return true;
+}
+
+
+// (for IT LIST ...BODY)
+bool primitive_for(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "for"));
+    TRY(VM_top1.size >= 4, error_log("expected 4 elements for 'for' got %d", VM_top1.size));
+    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole for the iterator name got %s", tag_to_string(VM_top1.list[1].tag)));
+    
     // TYPED optionnal
     size_t it_idx = local_Variable((Variable){ 
-        .name = li.list[1], 
+        .name = VM_top1.list[1],
         .value = {
             .tag = tag_reference,
             .list = List_alloc(sizeof(List))
@@ -827,34 +924,46 @@ bool primitive_for(const List li, List *out)
         .type = ANY_TYPE
     });
 
-    for (int i = 0; i < iterable.size; i++)
+    VM_push(VM_top1.list[2]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list, error_log("expected a list to iterate in for loop got %s", tag_to_string(VM_top1.tag)));
+
+
+    VM_push(NIL_LIST);
+    for (int i = 0; i < VM_top2.size; i++)
     {
-        TRY(g_ctx->stack.arr[it_idx].value.list);
-        *g_ctx->stack.arr[it_idx].value.list = iterable.list[i];
+        assert(g_ctx->stack.arr[it_idx].value.tag == tag_reference);
+        assert(g_ctx->stack.arr[it_idx].value.list);
+
+        *g_ctx->stack.arr[it_idx].value.list = VM_top2.list[i];
         
-        for (int j = 3; j < li.size; j++)
-            TRY(eval(li.list[j], out), error_log("while evaluating for loop body"));
+        for (int j = 3; j < VM_top3.size; j++)
+            TRY(eval(), error_log("while evaluating for loop body"));
     }
-    
+    VM_top3 = VM_top1;
+    VM_pop;
+    VM_pop;
     return true;
 }
 
-bool primitive_format(const List li, List *out)
+bool primitive_format(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "format"));
-    TRY(li.size >= 2, error_log("expected at least 2 elements for 'format' got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "format"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'format' got %d", VM_top1.size));
 
     static Strb acc = {0};
     acc.size = 0;
 
-    for (int i = 1; i < li.size; i++)
+    for (int i = 1; i < VM_top1.size; i++)
     {
         List tmp = {0};
-        TRY(eval(li.list[i], &tmp));
-        TRY(dump(&acc, tmp));
+        VM_push(VM_top1.list[i]);
+        TRY(eval());
+        TRY(dump(&acc, VM_top1));
+        VM_pop;
     }
     
-    *out = (List){
+    VM_top1 = (List){
         .tag = tag_string,
         .size = acc.size,
         .str = List_duplicate(acc.arr, acc.size)
@@ -862,151 +971,175 @@ bool primitive_format(const List li, List *out)
     return true;
 }
 
-bool primitive_quote(const List li, List *out)
+bool primitive_quote(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "quote"));
-    TRY(li.size == 2, error_log("expected 2 elements for 'quote' got %d", li.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "quote"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'quote' got %d", VM_top1.size));
 
-    *out = li.list[1];
+    VM_top1 = VM_top1.list[1];
     return true;
 }
 
-bool primitive_typeof(const List li, List *out)
+bool primitive_typeof(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "typeof"));
-    TRY(li.size == 2, error_log("expected 2 elements for 'typeof' got %d", li.size));
-    TRY(eval(li.list[1], out));
-    *out = typeof_List(*out);
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "typeof"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'typeof' got %d", VM_top1.size));
+
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    VM_top1 = typeof_List(VM_top1);
+
     return true;
 }
 
-bool primitive_eval(const List li, List *out)
+bool primitive_eval(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "eval"));
-    TRY(li.size >= 2, error_log("expected at least 2 elements for 'eval' got %d", li.size));
-    *out = (List){
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "eval"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'eval' got %d", VM_top1.size));
+    VM_top1 = (List){
         .tag = tag_list,
-        .size = li.size-1,
-        .list = List_alloc(sizeof(List) * (li.size - 1))
+        .size = VM_top1.size-1,
+        .list = List_alloc(sizeof(List) * (VM_top1.size - 1))
     };
-    for (int i = 1; i < li.size; i++)
-        TRY(eval(li.list[i], &out->list[i-1]));
-    
-    return true;
-}
-
-bool primitive_type(const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "type"));
-    TODO("type");
-    TRY(li.size == 2, error_log("expected 2 elements for 'type' got %d", li.size));
-    *out = (List){
-        .tag = tag_type,
-        .type_tag = li.list[1].tag,
-    };
-    if (out->tag == tag_list)
+    for (int i = 1; i < VM_top1.size; i++)
     {
-        out->size = li.list[1].size,
-        out->list = List_alloc(sizeof(List) * (li.size - 1));
+        VM_push(VM_top1.list[i]);
+        TRY(eval());
+        VM_top2.list[i-1] = VM_top1;
+        VM_pop;
     }
-    for (int i = 1; i < li.size; i++)
-        TRY(eval(li.list[i], &out->list[i-1]));
     
     return true;
 }
 
-bool primitive_len(const List li, List *out)
+bool primitive_type(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "len"));
-    TRY(li.size == 2, error_log("expected 2 elements for 'len' got %d", li.size));
-    List list = {0};
-    TRY(eval(li.list[1], &list));
-    TRY(list.tag == tag_list 
-        || list.tag == tag_string
-        || list.tag == tag_symbole);
-    *out = (List){
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "type"));
+    TODO("type");
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'type' got %d", VM_top1.size));
+    VM_push((List){
+        .tag = tag_type,
+        .type_tag = VM_top1.list[1].tag,
+    });
+    if (VM_top1.type_tag == tag_list)
+    {
+        VM_top1.size = VM_top2.list[1].size,
+        VM_top1.list = List_alloc(sizeof(List) * VM_top1.size);
+
+        VM_push(NIL_LIST);
+        for (int i = 0; i < VM_top3.list[1].size; i++)
+        {
+            VM_top1 = VM_top3.list[1].list[i];
+            TRY(primitive_type());
+            VM_top2.list[i] = VM_top1;
+        }
+        VM_pop;
+    }
+    VM_top2 = VM_top1;
+    VM_pop;
+    
+    return true;
+}
+
+bool primitive_len(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "len"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'len' got %d", VM_top1.size));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list 
+     || VM_top1.tag == tag_string
+     || VM_top1.tag == tag_symbole);
+    VM_top1 = (List){
+        .integer = VM_top1.size,
         .tag = tag_integer,
-        .integer = list.size
     };
     return true;
 }
 
-bool primitive_dollar(const List li, List *out)
+bool primitive_dollar(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "$"));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "$"));
     TODO("$");
-    TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
-    List res = {0};
+    /* TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
+
     TRY(eval(li.list[1], &res));
 
     for (int i = 2; i < li.size; i++)
     {
     }
-    *out = res;
+    *out = res; */
     return true;
 }
 
 // create a copy but with evaluated elements
-bool primitive_list(const List li, List *out)
+bool primitive_list(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "list"));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "list"));
 
-    TRY(li.size >= 2, error_log("expected at least 2 elements for 'list' got %d", li.size));
-    List res = {
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'list' got %d", VM_top1.size));
+
+    VM_push((List){
         .tag = tag_list,
-        .size = li.size - 1,
-        .list = List_alloc(sizeof(List) * (li.size-1))
-    };
-    for (int i = 1; i < li.size; i++)
-        TRY(eval(li.list[1], &res.list[i-1]));
-    
-    *out = res;
+        .size = VM_top1.size - 1,
+        .list = List_alloc(sizeof(List) * (VM_top1.size-1))
+    });
+    VM_push(NIL_LIST);
+    for (int i = 0; i+1 < VM_top3.size; i++)
+    {
+        VM_top1 = VM_top3.list[i+1];
+        TRY(eval());
+        VM_top2.list[i] = VM_top1;
+    }
+    VM_top3 = VM_top2;
+    VM_pop;
+    VM_pop;
     return true;
 }
 
 // create an array of size n
-bool primitive_array(const List li, List *out)
+bool primitive_array(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "array"));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "array"));
 
-    TRY(li.size == 2, error_log("expected 2 elements for 'array' got %d", li.size));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'array' got %d", VM_top1.size));
 
-    List count = {0};
-    TRY(eval(li.list[1], &count));
-    TRY(count.tag == tag_integer);
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_integer);
     
-    *out = (List){
+    VM_top1 = (List){
         .tag = tag_list,
-        .size = count.integer,
-        .list = List_alloc(sizeof(List) * count.integer)
+        .size = VM_top1.integer,
+        .list = List_alloc(sizeof(List) * VM_top1.integer)
     };
     return true;
 }
 
-bool primitive_reference(const List li, List *out)
+bool primitive_reference(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "reference"));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "reference"));
 
-    TRY(li.size == 2, error_log("expected 2 elements for 'reference' got %d", li.size));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'reference' got %d", VM_top1.size));
 
-    *out = (List){
+    VM_top1 = (List){
         .tag = tag_reference,
-        .list = List_duplicate(&li.list[1], sizeof(li.list[1]))
+        .list = List_duplicate(&VM_top1.list[1], sizeof(VM_top1.list[1]))
     };
     
     return true;
 }
 
-bool primitive_dereference(const List li, List *out)
+bool primitive_dereference(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(li.list[0], "dereference"));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "dereference"));
 
-
-    TRY(li.size == 2, error_log("expected 2 elements for 'dereference' got %d", li.size));
-    List to_deref = {0};
-    TRY(eval(li.list[1], &to_deref));
-    TRY(to_deref.tag == tag_reference, error_log("exprected a tag_reference but got %s", tag_to_string(to_deref.tag)));
-    *out = *to_deref.list;
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'dereference' got %d", VM_top1.size));
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_reference, error_log("exprected a tag_reference but got %s", tag_to_string(VM_top1.tag)));
+    VM_top1 = *VM_top1.list;
 
     return true;
 }

@@ -10,14 +10,14 @@
 //         )
 // }
 
-bool have_function_shape(const List li)
+bool have_function_arguments_shape(const List li)
 {
+    // TRY(li.size >= 2);
+    // TRY(li.list[0].tag == tag_list);
     TRY(li.tag == tag_list);
-    TRY(li.size >= 2);
-    TRY(li.list[0].tag == tag_list);
-    for (int i = 0; i < li.list[0].size; i++)
-        TRY(li.list[0].list[i].tag == tag_symbole // symbole that will be link to a type or a is a local variable
-         || li.list[0].list[i].tag == tag_type);  // or a type
+    for (int i = 0; i < li.size; i++)
+        TRY(li.list[i].tag == tag_symbole // symbole that will be link to a type or a is a local variable
+         || li.list[i].tag == tag_type);  // or a type
     return true;
 }
 

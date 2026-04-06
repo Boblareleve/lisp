@@ -19,42 +19,41 @@ bool test_eval(List root)
     ) { // expect error
         for (int i = 1; i < root.size; i++)
         {
-            List tmp = {0};
-            if (!eval(root.list[i], &tmp))
+            VM_push(root.list[i]);
+            if (!eval())
             {
                 Lisp_context_free();
                 return true;
             }
+            VM_pop;
         }
         fprintf(fd, "no error while expecting one\t");
         goto fail;
     }
 
     
-    List expect = {0};
-    GOTRY(eval(root.list[0], &expect), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+    VM_push(root.list[0]);
+    GOTRY(eval(), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
 
     // last expected to be equal to "expect"
-    List tmp = (List){0};
+    VM_push(NIL_LIST);
     for (int i = 1; i < root.size; i++)
     {
-        tmp = (List){0};
-        GOTRY(eval(root.list[i], &tmp), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+        VM_top1 = root.list[i];
+        GOTRY(eval(), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
     }
-    GOTRY(List_equal(expect, tmp),
+    GOTRY(List_equal(VM_top1, VM_top2),
         fprintf(fd, "unexpected result got: '");
-        List_print(tmp);
+        List_print(VM_top1);
         fprintf(fd, "'  expecting: '");
-        List_print(expect);
+        List_print(VM_top2);
         fprintf(fd, "'\t");
     );
 
     Lisp_context_free();
-    
     return true;
 fail:
     Lisp_context_free();
-    error.size = 0;
     return false;
 }
 
@@ -65,12 +64,12 @@ bool test(const Strv str)
         return true;   
     List root = {0};
     
+    // parse
     TRY(lists(str, &root), fprintf(fd, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view)); error.size = 0;);
     
     // run
-    TRY(test_eval(root), error.size = 0);
+    TRY(test_eval(root));
 
-    error.size = 0;
     return true;
 }
 
@@ -100,8 +99,7 @@ int main(int argc, char **argv)
         
         Strb_free(raw);
     }
-    Strb_free(error);
-
+    
     free(g_ctx);
     return 0;
 }

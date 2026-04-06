@@ -3,7 +3,7 @@
 #include "lisp.h"
 
 
-Strb error = {0};
+// Strb error = {0};
 Lisp_context *g_ctx = NULL;
 
 #define VAR_IS_NULL(var)  ((var).name.str == NULL)
@@ -34,18 +34,11 @@ Variable *get_local_Variable(List name)
     }
     return NULL;
 }
-
 Variable *get_global_Variable(List name)
 {   
     TRY(name.tag == tag_symbole);
     return set_Variable_get(&g_ctx->variables, (Variable){ .name = name });
 }
-
-/* Variable *get_function(List name)
-{   
-    assert(name.tag == tag_symbole);
-    return set_Variable_get(&g_ctx->functions, (Variable){ .name = name });
-} */
 
 Variable *get_Variable(List name)
 {
@@ -55,12 +48,6 @@ Variable *get_Variable(List name)
         return res;
     return get_global_Variable(name);
 }
-
-/* Variable *get_type(List name)
-{
-    assert(name.tag == tag_symbole);
-    return set_Variable_get(&g_ctx->types, (Variable){ .name = name });
-} */
 
 // return index in the call stack
 size_t local_Variable(Variable var)
@@ -112,8 +99,9 @@ bool push_stack_frame(void)
     return true;
 }
 
+
 // push args with their names in stack
-static inline bool prepare_function(List *return_type, const List li, const List args_def)
+/* static inline bool _prepare_function(List *return_type)
 {
     bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
     int arg_position = 1;
@@ -133,7 +121,8 @@ static inline bool prepare_function(List *return_type, const List li, const List
     
                 have_a_type_hint = false; 
                 da_push(&g_ctx->stack, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
-                TRY(eval(li.list[arg_position++], &da_top(&g_ctx->stack).value));
+                TRY(eval());
+                // li.list[arg_position++], &da_top(&g_ctx->stack).value
                 continue;
             }
         }
@@ -152,108 +141,136 @@ static inline bool prepare_function(List *return_type, const List li, const List
     }
     return true;
 }
+ */
 
-// li: (((args_def ...) statements ...) args_call)
-// or
-// function_def != NULL => li: (name args_call) and function_def: ((args_def ...) statements ...)
-bool eval_function(const List li, const List *function_def, List *out)
+ // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
+static inline bool prepare_function(void)
 {
-    const List func_def = function_def ? *function_def : li.list[0];
-    TRY(func_def.tag == tag_list && func_def.size >= 2, error_log("not a function definition"));
+    assert(VM_top1.tag == tag_list);
+    assert(VM_top2.size-1 == VM_top1.list[0].size);
+    // bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
+    for (int i = 0; i < VM_top1.size; i++)
+    {
+        da_push(&g_ctx->stack, (Variable){
+            .name = VM_top1.list[0].list[i],
+            .type = ANY_TYPE, // TODO types
+        });
 
-    const List args_def = func_def.list[0];
-    TRY(args_def.tag == tag_list, error_log("argument definition is not a list got %s", tag_to_string(args_def.tag)));
-    
-    push_stack_frame();
-
-    List return_type = ANY_TYPE; 
-    TRY(prepare_function(&return_type, li, args_def), pop_stack_frame());
-
-    // execute statements
-    for (int i = 1; i+1 < func_def.size; i++)
-        if (!eval(func_def.list[i], out))
-        {
-            if (g_ctx->in_return) // return have been call
-            {
-                error.size = 0;           // reset error need to find solution for that
-                g_ctx->in_return = false; // not in return anymore
-                pop_stack_frame();
-                return true; // terminate
-            }
-            return false; // true error
-        }
-    
-    // return the last one
-    TRY(eval(func_def.list[func_def.size-1], out), pop_stack_frame());
-    TRY(is_of_type(*out, return_type), error_log("function return unexpected type"); pop_stack_frame());
-    
+        VM_push(VM_top2.list[i+1]);
+        TRY(eval());
+        da_top(&g_ctx->stack).value = VM_top1;
+        VM_pop;
+    }
     return true;
 }
 
 
-bool eval(const List li, List *out)
+// 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
+bool eval_function(void)
 {
-    TRY(out, error_log("no output"));
-    *out = NIL_LIST;
+    TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
+    TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
+    TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("TODO 564"));
+    TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
+    
+    // const List args_def = function_def.list[0];
+
+    push_stack_frame();
+
+    List return_type = ANY_TYPE;
+    TRY(prepare_function(), pop_stack_frame());
+
+    const int vm_stack_sp = g_ctx->vm_stack.size;
+
+    // execute statements
+    for (int i = 1; i+1 < VM_top1.size; i++)
+    {
+        VM_push(VM_top1.list[i]);
+        if (!eval())
+        {
+            if (g_ctx->in_return) // return have been call
+            {
+                reset_error(); // need to find solution for that
+                g_ctx->in_return = false; // not in return anymore
+                pop_stack_frame();
+
+                // pop vm_stack frame
+                g_ctx->vm_stack.arr[vm_stack_sp-1] = VM_top1;
+                g_ctx->vm_stack.size = vm_stack_sp;
+                return true; // terminate
+            }
+            return false; // true error
+        }
+        VM_pop;
+    }
+    
+    // return the last one
+    VM_top2 = VM_top1.list[VM_top1.size-1]; // ¿return?
+    VM_pop;
+    TRY(eval(), pop_stack_frame());
+    TRY(is_of_type(VM_top1, return_type), error_log("function return unexpected type"); pop_stack_frame());
+    
+    pop_stack_frame();
+    return true;
+}
+
+bool eval(void) //const List li, List *out)
+{
 
     // dec ref count
-    if (li.quote_count > 0)
+    if (VM_top1.quote_count > 0)
     {
-        *out = li;
-        out->quote_count--;
+        VM_top1.quote_count--;
         return true;
     }
 
-    switch (li.tag)
-    {
-    // self-evaluating
-    case tag_type:
-    case tag_string:
-    case tag_true:
-    case tag_integer:
-    case tag_real: {
-        *out = li;
-    } return true;
-
-    case tag_reference: { // auto dereference
-        List res = *li.list;
-        TRY(eval(res, out));
-    } return true;
-
-    case tag_symbole: {
-        Variable *var = get_Variable(li);
-        TRY(var, error_log("no variable nor function named: %.*s", li.size, li.str));
-        *out = var->value;
-    } return true;
-    case tag_list: {
-        
+    if (VM_top1.tag == tag_list)
+    {    
         // nil|false
-        if (IS_NIL(li))
+        if (IS_NIL(VM_top1))
+            return true;
+        
+        if (VM_top1.list[0].tag == tag_list) // inline function
         {
-            *out = li;
+            VM_push(VM_top1.list[0]);
+            TRY(eval_function(), error_log("failed to call inline function"));
             return true;
         }
-        
-        if (li.list[0].tag == tag_list) // inline function
-        {
-            TRY(eval_function(li, &li.list[0], out), error_log("failed to call inline function"));
-            return true;
-        }
 
-        const List op = *li.list; 
-        TRY(op.tag == tag_symbole, error_log("unkown first list element primitive"));
+        // const List op = *li.list; 
+        TRY(VM_top1.list->tag == tag_symbole, error_log("unkown first list element primitive"));
         
-        primitive_t primitive = get_Primitive(op);
-        if (primitive) return primitive(li, out);
+        primitive_t primitive = get_Primitive(VM_top1.list[0]);
+        if (primitive) return primitive();
 
         
-        Variable *var = get_Variable(op);
-        TRY(var, error_log("no primitive '%.*s' found to evaluate a list", op.size, op.str));
-        TRY(eval_function(li, &var->value, out));
-    } return true;
-
-    default: UNREACHABLE("eval switch"); return false;
+        Variable *var = get_Variable(VM_top1.list[0]);
+        TRY(var, error_log("no primitive '%.*s' found to evaluate a list", VM_top1.list->size, VM_top1.list->str));
+        // TODO("eval_fun");
+        VM_push(var->value);
+        TRY(eval_function());
+        return true;
     }
+    if (VM_top1.tag == tag_symbole)
+    {
+        Variable *var = get_Variable(VM_top1);
+        TRY(var, error_log("no variable nor function named: %.*s", VM_top1.size, VM_top1.str));
+        VM_top1 = var->value;
+        return true;
+    }
+    if (VM_top1.tag == tag_reference)
+    { // auto dereference
+        VM_top1 = *VM_top1.list;
+        TRY(eval());
+        return true;
+    }
+    if (is_list_self_evaluating(VM_top1.tag))
+    { // self-evaluating
+        return true;
+    }
+    
+    UNREACHABLE("eval switch");
+    return false;
 }
 
 
@@ -367,8 +384,8 @@ void Lisp_context_free(void)
 {
     { // free memory not tracked by gc
         da_free(&g_ctx->stack);
+        da_free(&g_ctx->vm_stack);
         
-    
         set_Variable_free(&g_ctx->variables);
         g_ctx->root = NIL_LIST;
     }
@@ -376,10 +393,10 @@ void Lisp_context_free(void)
     // GGGGGGGGGGGGGC!!
     garbage_collector();
 
-    
     set_void_ptr_free(&g_ctx->gc);
-
+    Strb_free(g_ctx->error);
     free(g_ctx);
+
     g_ctx = NULL;
 }
 
