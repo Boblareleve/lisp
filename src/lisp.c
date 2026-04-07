@@ -86,33 +86,6 @@ bool pop_stack_frame(void)
     return true;
 }
 
-bool half_stack_frame(void)
-{
-    
-    return true;
-}
-
-bool push_stack_frame(void)
-{
-    g_ctx->frame_index = g_ctx->stack.size+1;
-    return true;
-}
-
-
-
-
- // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
-/* static inline bool prepare_function(void)
-{
-    assert(VM_top1.tag == tag_list);
-    assert(VM_top1.list[0].tag == tag_list);
-    assert(VM_top2.tag == tag_list);
-    assert(VM_top2.size-1 == VM_top1.list[0].size);
-
-    
-    return true;
-} */
-
 
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
