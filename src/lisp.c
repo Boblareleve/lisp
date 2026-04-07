@@ -82,87 +82,36 @@ bool pop_stack_frame(void)
     TRY(g_ctx->frame_index > 0, error_log("try to return from root stack frame"));
     g_ctx->stack.size = g_ctx->frame_index-1;
     assert(g_ctx->stack.arr[g_ctx->frame_index-1].name.tag == ttag_frame);
-    g_ctx->frame_index = g_ctx->stack.arr[g_ctx->frame_index].value.integer;
+    g_ctx->frame_index = g_ctx->stack.arr[g_ctx->frame_index-1].value.integer;
     return true;
 }
+
+bool half_stack_frame(void)
+{
+    
+    return true;
+}
+
 bool push_stack_frame(void)
 {
-    da_push(&g_ctx->stack, (Variable){
-        .name = { .tag = ttag_frame },
-        .value = {
-            .tag = tag_integer,
-            .integer = g_ctx->frame_index,
-        },
-        .type = ANY_TYPE   
-    });
-    g_ctx->frame_index = g_ctx->stack.size;
+    g_ctx->frame_index = g_ctx->stack.size+1;
     return true;
 }
 
 
-// push args with their names in stack
-/* static inline bool _prepare_function(List *return_type)
-{
-    bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
-    int arg_position = 1;
-    
-    for (int i = 0; i < args_def.size; i++)
-    {
-        List type = NIL_LIST;
-        {
-            Variable *var_type = NULL;
-            if (args_def.list[i].tag == tag_type)
-                type = args_def.list[i];
-            else if ((var_type = get_Variable(args_def.list[i])) && var_type->value.tag == tag_type)
-                type = var_type->value; // unwrap type
-            else
-            { // normal argument
-                TRY(args_def.list[i].tag == tag_symbole);
-    
-                have_a_type_hint = false; 
-                da_push(&g_ctx->stack, (Variable){ .name = args_def.list[i], .type = ANY_TYPE });
-                TRY(eval());
-                // li.list[arg_position++], &da_top(&g_ctx->stack).value
-                continue;
-            }
-        }
-        
-        if (have_a_type_hint) 
-        { // if this is an hint and the last argument have already been hinted this as to be the last hint for the return value
-            TRY(i + 1 == args_def.size, error_log("two function argument hint not at the end of the argument list"));
-            *return_type = type;
-            break;
-        }
-        // normal type hint
-        TRY(i > 0, error_log("type decoration goes after a symbole"));
-        da_top(&g_ctx->stack).type = type;
-        TRY(is_of_type(da_top(&g_ctx->stack).value, da_top(&g_ctx->stack).type), error_log("bad argument type"));
-        have_a_type_hint = true;
-    }
-    return true;
-}
- */
+
 
  // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
-static inline bool prepare_function(void)
+/* static inline bool prepare_function(void)
 {
     assert(VM_top1.tag == tag_list);
+    assert(VM_top1.list[0].tag == tag_list);
+    assert(VM_top2.tag == tag_list);
     assert(VM_top2.size-1 == VM_top1.list[0].size);
-    // bool have_a_type_hint = true; // the last argument got a type hint -> if new hint -> it's the return type hint
-    for (int i = 0; i < VM_top1.size; i++)
-    {
-        da_push(&g_ctx->stack, (Variable){
-            .name = VM_top1.list[0].list[i],
-            .type = ANY_TYPE, // TODO types
-        });
 
-        VM_push(VM_top2.list[i+1]);
-        TRY(eval());
-        da_top(&g_ctx->stack).value = VM_top1;
-        VM_pop;
-    }
+    
     return true;
-}
+} */
 
 
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
@@ -170,15 +119,48 @@ bool eval_function(void)
 {
     TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
-    TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("TODO 564"));
+    TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
     TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
     
-    // const List args_def = function_def.list[0];
-
-    push_stack_frame();
-
     List return_type = ANY_TYPE;
-    TRY(prepare_function(), pop_stack_frame());
+    
+    { // heresy
+        da_push(&g_ctx->stack, (Variable){
+            .name = { .tag = ttag_frame },
+            .value = {
+                .tag = tag_integer,
+                .integer = g_ctx->frame_index,
+            },
+            .type = ANY_TYPE   
+        });
+        // war crime ahead (no, you don't get an explaination); war crimes are hard to debug :<
+        int true_stack_size = g_ctx->stack.size;
+        da_push_nzeros(&g_ctx->stack, VM_top1.list[0].size);
+        g_ctx->stack.size = true_stack_size-1;
+    
+        g_ctx->stack_allocation_allowed = false;
+    
+        for (int i = 0; i < VM_top1.list[0].size; i++)
+        {
+            VM_push(VM_top2.list[i+1]);
+            {
+                int save = g_ctx->stack.size;
+                TRY(eval(), g_ctx->stack.size--);
+                assert(save == g_ctx->stack.size);
+    
+                g_ctx->stack.arr[true_stack_size++] = (Variable){
+                    .name = VM_top2.list[0].list[i],
+                    .type = ANY_TYPE, // TODO types
+                    .value = VM_top1
+                };
+            }
+            VM_pop;
+        }
+        g_ctx->frame_index = g_ctx->stack.size+1;
+        g_ctx->stack.size = true_stack_size;
+        g_ctx->stack_allocation_allowed = true;
+    }
+
 
     const int vm_stack_sp = g_ctx->vm_stack.size;
 
@@ -195,8 +177,8 @@ bool eval_function(void)
                 pop_stack_frame();
 
                 // pop vm_stack frame
-                g_ctx->vm_stack.arr[vm_stack_sp-1] = VM_top1;
-                g_ctx->vm_stack.size = vm_stack_sp;
+                g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
+                g_ctx->vm_stack.size = vm_stack_sp-1;
                 return true; // terminate
             }
             return false; // true error
@@ -233,6 +215,7 @@ bool eval(void) //const List li, List *out)
         if (VM_top1.list[0].tag == tag_list) // inline function
         {
             VM_push(VM_top1.list[0]);
+            TRY(eval());
             TRY(eval_function(), error_log("failed to call inline function"));
             return true;
         }
@@ -358,6 +341,7 @@ Lisp_context *Lisp_context_init(List root)
     Lisp_context *res = calloc(1, sizeof(*res));
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
+    res->stack_allocation_allowed = true;
 
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))

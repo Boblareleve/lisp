@@ -233,56 +233,76 @@ static inline List typeof_List(List li)
     };
     return res;
 }
+static inline List List_sublist(List li, uint16_t stride, uint16_t size)
+{
+    assert(li.tag == tag_list);
+    if (li.size <= stride || size == 0)
+        return NIL_LIST;
+    return (List){
+        .tag = tag_list,
+        .offset = li.offset + stride,
+        .size = size,
+        .list = &li.list[stride]
+    };
+}
+static inline List List_stride(List li, uint16_t stride)
+{
+    return List_sublist(li, stride, li.size - stride);
+}
+
 
 // create and initilize a local variable -> return is undefined
 bool primitive_local(void) // const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
-    TRY(VM_top1.size == 3, error_log("expected 3 element for 'local' got %d", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
-    
-    VM_push(VM_top1.list[2]);
-    TRY(eval());
-    
-    local_Variable((Variable){
-        .name = VM_top2.list[1],
-        .type = ANY_TYPE,
-        .value = VM_top1
-    });
-    VM_pop;
-    return true;
+    TRY(g_ctx->stack_allocation_allowed, error_log("can't create a variable in call arguments"));
+    if (VM_top1.size == 3)
+    { // (local NAME VALUE)
+        TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
+        
+        VM_push(g_ctx->vm_stack.arr[g_ctx->vm_stack.size-1].list[2]);
+        TRY(eval());
+        
+        local_Variable((Variable){
+            .name = VM_top2.list[1],
+            .type = ANY_TYPE,
+            .value = VM_top1
+        });
+        VM_pop;
+        VM_top1 = NIL_LIST;
+        return true;
+    }
+    if (VM_top1.size == 4)
+    { // (local NAME TYPE VALUE)
+        TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
+
+        VM_push(VM_top1.list[2]);
+        TRY(eval());
+        TRY(VM_top1.tag == tag_type, error_log("expected a type at position 2 of local got %s", tag_to_string(VM_top1.tag)));
+
+        VM_push(VM_top2.list[3]);
+        TRY(eval());
+        
+        local_Variable((Variable){ 
+            .name = VM_top3.list[1],
+            .type = VM_top2,
+            .value = VM_top1
+        });
+        VM_pop;
+        VM_pop;
+        VM_top1 = NIL_LIST;
+        return true;
+    }
+
+    error_log("expected 3 or 4 element for 'local' got %d", VM_top1.size);
+    return false;
 }
 
-// create and initilize a typed local variable -> return is undefined
-bool primitive_tlocal(void) // const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
-    TRY(VM_top1.size == 4, error_log("expected 3 element for 'local' got %d", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
-
-    VM_push(VM_top1.list[2]);
-    TRY(eval());
-
-    VM_rotate;
-    
-    VM_push(VM_top1.list[3]);
-    TRY(eval());
-    
-    local_Variable((Variable){ 
-        .name = VM_top2.list[1],
-        .type = VM_top1,
-        .value = VM_top3
-    });
-    VM_pop;
-    VM_pop;
-    return true;
-}
 
 // create and initilize a global variable
 bool primitive_global(void) // const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "global"));
-    // UNUSED(out);
     TRY(VM_top1.size == 3, error_log("expected 3 element for 'global' got %d", VM_top1.size));
     TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'global' to got %s", tag_to_string(VM_top1.list[1].tag)));
 
@@ -295,7 +315,8 @@ bool primitive_global(void) // const List li, List *out)
         .value = VM_top1
     };
     TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
-    
+    VM_pop;
+    VM_top1 = NIL_LIST;
     return true;
 }
 
@@ -313,7 +334,8 @@ bool primitive_defun(void) // const List li, List *out)
     };
     // set or replace function var.name
     TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
-    
+
+    VM_top1 = NIL_LIST;
     return true;
 }
 
@@ -348,6 +370,8 @@ bool primitive_assign(void)
             else
                 var->value = VM_top1;
         }
+        VM_top2 = VM_top1;
+        VM_pop;
 
         // TODO
         // TRY(is_of_type(VM_top1, VM_top2.list[]))
@@ -403,10 +427,10 @@ bool primitive_square_bracket(void)
         TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
         TRY(VM_top2.integer < VM_top1.integer && VM_top1.integer <= VM_top3.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top3.size));
 
-        VM_top4 = VM_top3;
-        VM_top4.size = VM_top1.integer - VM_top2.integer; // [] '(1 2 3) 1 2 -> .size = 1  
-        VM_top4.offset += VM_top2.integer;                //                 -> offset+1
-        VM_top4.list   += VM_top2.integer;                //                 -> ptr + 1
+        VM_top4 = List_sublist(VM_top3, VM_top2.integer, VM_top1.integer - VM_top2.integer);
+        // VM_top4.size = VM_top1.integer - VM_top2.integer; // [] '(1 2 3) 1 2 -> .size = 1  
+        // VM_top4.offset += VM_top2.integer;                //                 -> offset+1
+        // VM_top4.list   += VM_top2.integer;                //                 -> ptr + 1
         
         VM_pop; VM_pop; VM_pop;
         return true;
@@ -417,7 +441,7 @@ bool primitive_square_bracket(void)
         .list = &VM_top2.list[VM_top1.integer],
         .offset = VM_top1.integer
     };
-    
+
     VM_pop; VM_pop;
     return true;
 }
@@ -437,7 +461,7 @@ bool primitive_exclamation_mark(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "?"));
     TRY(VM_top1.size == 4, error_log("expected 4 element for '?' got %d", VM_top1.size));
-    List cond = {0};
+    // List cond = {0};
     VM_push(VM_top1.list[1]);
     TRY(eval());
     
@@ -485,6 +509,7 @@ bool primitive_print(void)
         TRY(List_print(VM_top1), error_log("failed to print"));
     }
     VM_pop;
+    VM_top1 = NIL_LIST;
     return true;
 }
 
@@ -513,6 +538,8 @@ bool primitive_while(void)
             TRY(eval());
         }
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -529,7 +556,7 @@ bool primitive_return(void)
         VM_top1 = NIL_LIST;
     
     g_ctx->in_return = true;
-    return false;
+    return false; // not a real error
 }
 
 bool primitive_plus(void)
@@ -549,6 +576,8 @@ bool primitive_plus(void)
         TRY(!IS_NIL(VM_top2));
         VM_pop;
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -597,6 +626,8 @@ bool primitive_minus(void)
         TRY(!IS_NIL(VM_top2));
         VM_pop;
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -617,6 +648,8 @@ bool primitive_product(void)
         TRY(!IS_NIL(VM_top2));
         VM_pop;
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -637,6 +670,8 @@ bool primitive_div(void)
         TRY(!IS_NIL(VM_top2));
         VM_pop;
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -657,6 +692,8 @@ bool primitive_integer_div(void)
         TRY(!IS_NIL(VM_top2));
         VM_pop;
     }
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -682,6 +719,8 @@ bool primitive_equal(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -707,6 +746,8 @@ bool primitive_less_or_equal_than(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -732,6 +773,8 @@ bool primitive_more_or_equal_than(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -757,6 +800,8 @@ bool primitive_more_than(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -782,6 +827,8 @@ bool primitive_less_than(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -807,6 +854,8 @@ bool primitive_not_equal(void)
         }
         VM_pop;
     }
+    VM_pop;
+    VM_top1 = TRUE_LIST;
     return true;
 }
 
@@ -826,7 +875,7 @@ bool primitive_and(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "&&"));
     TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for '&&' got %d", VM_top1.size));
-
+    
     for (int i = 1; i < VM_top2.size; i++)
     {
         VM_push(VM_top1.list[i]);
@@ -857,12 +906,12 @@ bool primitive_or(void)
         if (!IS_NIL(VM_top1))
         {
             VM_pop;
-            VM_top1 = NIL_LIST;
+            VM_top1 = TRUE_LIST;
             return true;
         }
         VM_pop;
     }
-    VM_top1 = TRUE_LIST;
+    VM_top1 = NIL_LIST;
     return true;
 }
 
@@ -895,16 +944,19 @@ bool primitive_next(void)
 
     TRY(VM_top1.tag == tag_list);
 
-    VM_top2 = (VM_top1.size <= 1) ? NIL_LIST : (List){
-        .tag = tag_list,
-        .offset = VM_top2.offset + 1,
-        .size = VM_top1.size - 1,
-        .list = &VM_top2.list[1]
-    };
+    VM_top2 = List_stride(VM_top1, 1);
+    // (VM_top1.size <= 1) ? NIL_LIST : (List){
+    //     .tag = tag_list,
+    //     .offset = VM_top2.offset + 1,
+    //     .size = VM_top1.size - 1,
+    //     .list = &VM_top2.list[1]
+    // };
     VM_pop;
 
     return true;
 }
+
+
 
 
 // (for IT LIST ...BODY)
@@ -917,12 +969,16 @@ bool primitive_for(void)
     // TYPED optionnal
     size_t it_idx = local_Variable((Variable){ 
         .name = VM_top1.list[1],
-        .value = {
-            .tag = tag_reference,
-            .list = List_alloc(sizeof(List))
-        },
+        .value = NIL_LIST,
         .type = ANY_TYPE
     });
+    //     .name = VM_top1.list[1],
+    //     .value = {
+    //         .tag = tag_reference,
+    //         .list = List_alloc(sizeof(List))
+    //     },
+    //     .type = ANY_TYPE
+    // });
 
     VM_push(VM_top1.list[2]);
     TRY(eval());
@@ -932,13 +988,17 @@ bool primitive_for(void)
     VM_push(NIL_LIST);
     for (int i = 0; i < VM_top2.size; i++)
     {
-        assert(g_ctx->stack.arr[it_idx].value.tag == tag_reference);
-        assert(g_ctx->stack.arr[it_idx].value.list);
+        // assert(g_ctx->stack.arr[it_idx].value.tag == tag_reference);
+        // assert(g_ctx->stack.arr[it_idx].value.list);
+        // *g_ctx->stack.arr[it_idx].value.list = VM_top2.list[i];
 
-        *g_ctx->stack.arr[it_idx].value.list = VM_top2.list[i];
+        g_ctx->stack.arr[it_idx].value = VM_top2.list[i];
         
         for (int j = 3; j < VM_top3.size; j++)
+        {
+            VM_top1 = VM_top3.list[j];
             TRY(eval(), error_log("while evaluating for loop body"));
+        }
     }
     VM_top3 = VM_top1;
     VM_pop;
@@ -956,7 +1016,7 @@ bool primitive_format(void)
 
     for (int i = 1; i < VM_top1.size; i++)
     {
-        List tmp = {0};
+        // List tmp = {0};
         VM_push(VM_top1.list[i]);
         TRY(eval());
         TRY(dump(&acc, VM_top1));
@@ -996,19 +1056,20 @@ bool primitive_eval(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "eval"));
     TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'eval' got %d", VM_top1.size));
-    VM_top1 = (List){
+    VM_push((List){
         .tag = tag_list,
         .size = VM_top1.size-1,
         .list = List_alloc(sizeof(List) * (VM_top1.size - 1))
-    };
-    for (int i = 1; i < VM_top1.size; i++)
+    });
+    for (int i = 1; i < VM_top2.size; i++)
     {
-        VM_push(VM_top1.list[i]);
+        VM_push(VM_top2.list[i]);
         TRY(eval());
         VM_top2.list[i-1] = VM_top1;
         VM_pop;
     }
-    
+    VM_top2 = VM_top1; 
+    VM_pop;
     return true;
 }
 
@@ -1182,7 +1243,6 @@ SET_IMPLEMENT_HASH_SET(Primitive, SET_PRIM_IS_NULL, SET_PRIM_SET_NULL, 2, 0.7, 6
 
 static const Primitive keys[] = {
     { .name = _cstr_to_List("local"),       .fun = primitive_local              },
-    { .name = _cstr_to_List("tlocal"),      .fun = primitive_tlocal             },
     { .name = _cstr_to_List("global"),      .fun = primitive_global             },
     { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
     { .name = _cstr_to_List("="),           .fun = primitive_assign             },

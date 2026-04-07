@@ -1,6 +1,6 @@
 
 
-WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-missing-braces -Wno-address'
+WFLAGS='-Wextra -Werror=incompatible-pointer-types -Wall -Wno-type-limits -Wno-missing-braces -Wno-address'
 
 OUT=lisp_d
 SRC='src/main.c src/lisp.c src/dump.c src/parse.c src/memory.c src/dl.c src/type.c src/eval_list.c'

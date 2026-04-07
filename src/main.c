@@ -33,15 +33,16 @@ bool test_eval(List root)
 
     
     VM_push(root.list[0]);
-    GOTRY(eval(), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+    GOTRY(eval(), fprintf(fd, "eval error while eval expected: "STRV_FMT"\t", STRV_UNPACK(g_ctx->error.view)));
 
     // last expected to be equal to "expect"
     VM_push(NIL_LIST);
     for (int i = 1; i < root.size; i++)
     {
         VM_top1 = root.list[i];
-        GOTRY(eval(), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(error.view)));
+        GOTRY(eval(), fprintf(fd, "unexpected error while eval: "STRV_FMT"\t", STRV_UNPACK(g_ctx->error.view)));
     }
+    GOTRY(g_ctx->vm_stack.size == 2,  fprintf(fd, "return into main with too many element on the stack got %d", g_ctx->vm_stack.size));
     GOTRY(List_equal(VM_top1, VM_top2),
         fprintf(fd, "unexpected result got: '");
         List_print(VM_top1);
@@ -63,9 +64,16 @@ bool test(const Strv str)
     if (str.size == 0)
         return true;   
     List root = {0};
+
+    Lisp_context tmp_ctx = {0};
+    set_Lisp_context(&tmp_ctx);
     
     // parse
-    TRY(lists(str, &root), fprintf(fd, "parse error: "STRV_FMT"\t", STRV_UNPACK(error.view)); error.size = 0;);
+    TRY(lists(str, &root), fprintf(fd, "parse error: "STRV_FMT"\t", STRV_UNPACK(g_ctx->error.view)); reset_error(););
+
+    g_ctx = NULL;
+    Strb_free(tmp_ctx.error);
+    
     
     // run
     TRY(test_eval(root));

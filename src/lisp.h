@@ -116,6 +116,7 @@ typedef struct Lisp_context
     // stack (local)
     int frame_index; // index of the first element of the frame
     da_Variable stack;
+    bool stack_allocation_allowed;
     bool in_return; // indicate that the error is only a return mechanism
                     // see with vm_stack
 
@@ -131,19 +132,22 @@ typedef struct Lisp_context
 // VM
 
 // lvalue
-#define VM_top1 (g_ctx->vm_stack.arr[g_ctx->vm_stack.size-1])
-#define VM_top2 (g_ctx->vm_stack.arr[g_ctx->vm_stack.size-2])
-#define VM_top3 (g_ctx->vm_stack.arr[g_ctx->vm_stack.size-3])
-#define VM_top4 (g_ctx->vm_stack.arr[g_ctx->vm_stack.size-4])
+#define VM_top1 (*(assert(g_ctx->vm_stack.size >= 1), &g_ctx->vm_stack.arr[g_ctx->vm_stack.size-1]))
+#define VM_top2 (*(assert(g_ctx->vm_stack.size >= 2), &g_ctx->vm_stack.arr[g_ctx->vm_stack.size-2]))
+#define VM_top3 (*(assert(g_ctx->vm_stack.size >= 3), &g_ctx->vm_stack.arr[g_ctx->vm_stack.size-3]))
+#define VM_top4 (*(assert(g_ctx->vm_stack.size >= 4), &g_ctx->vm_stack.arr[g_ctx->vm_stack.size-4]))
 
 
-#define VM_push(...) da_push(&g_ctx->vm_stack, __VA_ARGS__);
-#define VM_pop (g_ctx->vm_stack.size--)
-#define VM_rotate do { List VM_tmp = VM_top1; VM_top1 = VM_top2; VM_top2 = VM_tmp; } while (0)
+#define VM_push(...)\
+({\
+    __auto_type VM_tmp = __VA_ARGS__;\
+    da_push(&g_ctx->vm_stack, VM_tmp);\
+})
+#define VM_pop (assert(g_ctx->vm_stack.size > 0), g_ctx->vm_stack.size--)
 
 
 
-extern Strb error;
+// extern Strb error;
 #define error_log(msg, ...)\
 do {\
     if (g_ctx->error.size > 0) Strb_cat(&g_ctx->error, "\n");\

@@ -7,9 +7,5 @@
     ;; (print " ")
 )
 
-;; (local arr '(1 2 3))
-;; (for (it 0 (< it 10) (++ it))
-
-;; )
 sum
 ;; (print ")")

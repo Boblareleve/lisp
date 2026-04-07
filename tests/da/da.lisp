@@ -1,4 +1,4 @@
-
+t
 
 (defun da_make ((n int list) 
     (local res (list 2))
@@ -45,3 +45,4 @@
 
 ;; (print "\n\n" da)
 
+t

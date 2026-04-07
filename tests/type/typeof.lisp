@@ -7,7 +7,7 @@
     symbole 
     any
 )
-(tlocal x any 0)
+(local x any 0)
 (eval
     (typeof "bla")
     (typeof 3245)

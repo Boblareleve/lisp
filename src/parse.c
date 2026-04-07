@@ -222,7 +222,7 @@ bool list(Strv *str, List *li)
         uint32_t count = 1;
 
         do TRY(consume(str)); while (Strv_first(*str) == '\'');
-
+        
         TRY(list(str, li));
         li->quote_count = count;
         

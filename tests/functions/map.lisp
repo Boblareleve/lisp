@@ -6,14 +6,14 @@
 ;; res
 t
 
-(defun map ((li list fun list)
-    (local res (copy li))
-    (for it res
-        (= it (fun it))
+(defun map ((li fun) ; list fun list)
+    (= li (copy li))
+    (local i 0)
+    (while (< i (len li))
+        (= ([] li i) (fun ([] li i)))
+        (++ i)
     )
-    (print li)
-    (print res)
-    res
+    li
 ))
 
 (defun filter ((li list fun list)
@@ -23,11 +23,12 @@ t
 
 (local li '(1 2 3))
 (= ([] li 0) 4)
+(== li '(4 2 3))
 
-(for it li
-    (= it 0)
-)
-(== li '(0 0 0))
+;; (for it li
+;;     (= it 0)
+;; )
+(== (map li '((x) 0)) '(0 0 0))
 
 
 ;; (print (map li '((x) (++ x))))
