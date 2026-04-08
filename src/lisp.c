@@ -171,14 +171,12 @@ bool eval_function(void)
 
 bool eval(void) //const List li, List *out)
 {
-
     // dec ref count
     if (VM_top1.quote_count > 0)
     {
         VM_top1.quote_count--;
         return true;
     }
-
     if (VM_top1.tag == tag_list)
     {    
         // nil|false
@@ -199,7 +197,6 @@ bool eval(void) //const List li, List *out)
         primitive_t primitive = get_Primitive(VM_top1.list[0]);
         if (primitive) return primitive();
 
-        
         Variable *var = get_Variable(VM_top1.list[0]);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", VM_top1.list->size, VM_top1.list->str));
         // TODO("eval_fun");
@@ -276,8 +273,6 @@ List List_copy(const List li)
     }
     return li;
 }
-
-
 
 
 // !!shortcut GC!!

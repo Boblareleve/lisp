@@ -389,7 +389,7 @@ bool primitive_assign(void)
     {
         VM_push(VM_top2.list[2]);
         TRY(eval());
-        *VM_top2.list = VM_top1;
+        *VM_top2.list = VM_top1; // if VM_top1 is a ref to VM_top2 loop
         VM_top3 = VM_top1;
         VM_pop;
         VM_pop;

@@ -53,6 +53,8 @@ void *List_delc_alloc(void *ptr, size_t count)
 void *List_duplicate(const void *src, size_t count)
 {
     void *new = List_alloc(count);
+    if (!new)
+        return NULL;
     return memcpy(new, src, count);
 }
 
@@ -195,10 +197,12 @@ bool garbage_collector(void)
 {
     TRY(g_ctx);
     
-    
     gc_tag_context();
-
+    
+    
+#ifdef GC_REPORT
     size_t pointers_count = g_ctx->gc.size;
+#endif
     
     erase_untag(&g_ctx->gc);
 
@@ -210,8 +214,6 @@ bool garbage_collector(void)
         pointers_count - g_ctx->gc.size, pointers_count, 
         (1.0 - (double)g_ctx->gc.size / pointers_count) * 100.0
     );
-#else
-    (void)pointers_count;
 #endif
 
     return true;

@@ -71,6 +71,7 @@ bool test(const Strv str)
     // parse
     TRY(lists(str, &root), fprintf(fd, "parse error: "STRV_FMT"\t", STRV_UNPACK(g_ctx->error.view)); reset_error(););
 
+    set_void_ptr_free(&g_ctx->gc);
     g_ctx = NULL;
     Strb_free(tmp_ctx.error);
     

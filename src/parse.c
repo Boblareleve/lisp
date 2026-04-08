@@ -130,14 +130,12 @@ List escaping(Strv str)
 
 bool list(Strv *str, List *li)
 {
-    
-
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
     TRY(str->size > 0, error_log("empty input"));
     
     skip_comment(str);
-
+    
     if (Strv_first(*str) == '(')
     {
         li->tag = tag_list;
