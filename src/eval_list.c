@@ -255,7 +255,7 @@ static inline List List_stride(List li, uint16_t stride)
 bool primitive_local(void) // const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
-    TRY(g_ctx->stack_allocation_allowed, error_log("can't create a variable in call arguments"));
+    // TRY(g_ctx->stack_allocation_allowed, error_log("can't create a variable in call arguments"));
     if (VM_top1.size == 3)
     { // (local NAME VALUE)
         TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
@@ -463,7 +463,7 @@ bool primitive_square_bracket(void)
         TRY(eval());
         TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
         TRY(VM_top2.integer <= VM_top1.integer && VM_top1.integer <= VM_top3.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top3.size));
-        
+
         VM_top4 = List_sublist(VM_top3, VM_top2.integer, VM_top1.integer - VM_top2.integer);
         
         VM_pop; VM_pop; VM_pop;

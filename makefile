@@ -1,4 +1,4 @@
-.PHONY: all clean re san debug release
+.PHONY: all clean re san debug release tests
 
 
 CFLAGS=-I$(MY_LIB) -Wextra -Werror=incompatible-pointer-types -Wall -Wno-type-limits -Wno-missing-braces -Wno-address
@@ -65,6 +65,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 
 
-
+DIR ?= *
+EXE ?= lisp_s
+tests: san
+	./$(EXE) tests/$(DIR)/*.lisp
 
 

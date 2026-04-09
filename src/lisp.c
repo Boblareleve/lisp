@@ -26,7 +26,7 @@ SET_IMPLEMENT_HASH_SET(Variable, VAR_IS_NULL, VAR_SET_NULL, 4, 0.8, 64);
 
 Variable *get_local_Variable(List name)
 {   
-    for (int i = g_ctx->stack.size - 1; i >= g_ctx->frame_index; i--)
+    for (int i = g_ctx->stack.size - 1; i >= 0; i--)
     {
         TRY(g_ctx->stack.arr[i].name.tag == tag_symbole);
         if (List_str_equal(g_ctx->stack.arr[i].name, name))
@@ -52,7 +52,7 @@ Variable *get_Variable(List name)
 // return index in the call stack
 size_t local_Variable(Variable var)
 {
-    for (int i = g_ctx->stack.size-1; i >= g_ctx->frame_index; i--)
+    for (int i = g_ctx->stack.size-1; i >= 0; i--)
     {
         if (List_str_equal(g_ctx->stack.arr[i].name, var.name))
         {
@@ -76,13 +76,21 @@ bool global_Variable(Variable var)
     return true;
 }
 
+bool push_stack_frame(void)
+{
+    da_push(&g_ctx->stack, (Variable){
+        .name = _cstr_to_List(""),
+        .value = { .tag = ttag_frame },
+        .type = ANY_TYPE
+    });
+    return true;
+}
 
+// push a marker to pop to (do linear search as it can be mouved)
 bool pop_stack_frame(void)
 {
-    TRY(g_ctx->frame_index > 0, error_log("try to return from root stack frame"));
-    g_ctx->stack.size = g_ctx->frame_index-1;
-    assert(g_ctx->stack.arr[g_ctx->frame_index-1].name.tag == ttag_frame);
-    g_ctx->frame_index = g_ctx->stack.arr[g_ctx->frame_index-1].value.integer;
+    while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
+        g_ctx->stack.size--;
     return true;
 }
 
@@ -97,41 +105,23 @@ bool eval_function(void)
     
     List return_type = ANY_TYPE;
     
-    { // heresy
-        da_push(&g_ctx->stack, (Variable){
-            .name = { .tag = ttag_frame },
-            .value = {
-                .tag = tag_integer,
-                .integer = g_ctx->frame_index,
-            },
-            .type = ANY_TYPE   
-        });
-        // war crime ahead (no, you don't get an explaination); war crimes are hard to debug :<
-        int true_stack_size = g_ctx->stack.size;
-        da_push_nzeros(&g_ctx->stack, VM_top1.list[0].size);
-        g_ctx->stack.size = true_stack_size-1;
-    
-        g_ctx->stack_allocation_allowed = false;
-    
+    {
+        push_stack_frame();
+
         for (int i = 0; i < VM_top1.list[0].size; i++)
         {
             VM_push(VM_top2.list[i+1]);
             {
-                int save = g_ctx->stack.size;
-                TRY(eval(), g_ctx->stack.size--);
-                assert(save == g_ctx->stack.size);
-    
-                g_ctx->stack.arr[true_stack_size++] = (Variable){
+                TRY(eval(), pop_stack_frame());
+                
+                da_push(&g_ctx->stack, (Variable){
                     .name = VM_top2.list[0].list[i],
                     .type = ANY_TYPE, // TODO types
                     .value = VM_top1
-                };
+                });
             }
             VM_pop;
         }
-        g_ctx->frame_index = g_ctx->stack.size+1;
-        g_ctx->stack.size = true_stack_size;
-        g_ctx->stack_allocation_allowed = true;
     }
 
 
@@ -163,7 +153,7 @@ bool eval_function(void)
     VM_top2 = VM_top1.list[VM_top1.size-1]; // ¿return?
     VM_pop;
     TRY(eval(), pop_stack_frame());
-    TRY(is_of_type(VM_top1, return_type), error_log("function return unexpected type"); pop_stack_frame());
+    TRY(is_of_type(VM_top1, return_type), pop_stack_frame(); error_log("function return unexpected type"));
     
     pop_stack_frame();
     return true;
@@ -309,7 +299,7 @@ Lisp_context *Lisp_context_init(List root)
     Lisp_context *res = calloc(1, sizeof(*res));
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
-    res->stack_allocation_allowed = true;
+    // res->stack_allocation_allowed = true;
 
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
