@@ -1,6 +1,9 @@
 #include <dlfcn.h>
-#include <ffi.h>
+// #include <ffi.h>
 #include "lisp.h"
+
+
+
 
 List load_dl(const List path)
 {
@@ -29,35 +32,61 @@ List load_dl(const List path)
     };
 }
 
-List get_fun_dl(List lib, const List name, const List desc)
+
+ffi_type *List_type_to_ffi_type(const List type)
 {
-    UNUSED(desc);
-    if (name.tag != tag_string)
+    assert(type.tag == tag_type);
+    switch (type.type_tag)
     {
-        error_log("name is not a string, got %s", tag_to_string(name.tag));
-        return NIL_LIST;
+    case ttag_any_type: return &ffi_type_void;
+    case tag_integer:   return &ffi_type_sint64;
+    case tag_real:      return &ffi_type_double;
+    // case tag_string:    return ;
+    
+    default: UNREACHABLE("List_type_to_ffi_type"); return NULL;
     }
-    if (lib.tag != tag_dynamic_lib)
-    {
-        error_log("lib is not a dl, got %s", tag_to_string(lib.tag));
-        return NIL_LIST;
-    }
+}
+
+
+// const List desc = (args1_t args2_t... return_t)
+bool get_fun_dl(List lib, List *out, const List name, const List desc)
+{
+    TRY(name.tag == tag_string, error_log("name is not a string, got %s", tag_to_string(name.tag)));
+    TRY(lib.tag == tag_dynamic_lib, error_log("lib is not a dl, got %s", tag_to_string(lib.tag)));
 
     printf("name '%.*s'\n", name.size, name.str);
 
-    char buffer[512];
+    char buffer[1024];
     buffer[0] = 0;
 
-    (void)dlerror(); // flush potencial previous errors
+    (void)dlerror(); // flush previous errors
     void *fun_ptr = dlsym(lib.ptr, strncpy(buffer, name.str, MIN(sizeof(buffer), name.size)));
     const char *err = dlerror();
-    if (!fun_ptr || err)
+    TRY(fun_ptr && !err, error_log(err));
+    
+    Foreign_fun *ffun = List_alloc(sizeof(Foreign_fun) + sizeof(ffi_type) * (desc.size-1));
+    ffun->args_size = desc.size-1;
+
+    for (int i = 0; i < desc.size-1; i++)
     {
-        error_log(err);
-        return NIL_LIST;
+        TRY(desc.list[i].tag == tag_type, free(ffun); error_log("invalid get_fun_dl description"));
+        ffun->args[i] = List_type_to_ffi_type(desc.list[i]);
     }
-    
-    
+
+    TRY(desc.list[desc.size-1].tag == tag_type, free(ffun); error_log("invalid get_fun_dl description (return type)"));
+    ffi_status status = ffi_prep_cif(&ffun->cif,
+        FFI_DEFAULT_ABI,
+        ffun->args_size,
+        List_type_to_ffi_type(desc.list[desc.size-1]),
+        ffun->args
+    );
+    assert(status == FFI_OK);
+
+    *out = (List){
+        .tag = tag_foreign_function,
+        .ffun = ffun
+    };
+    return true;
     
     if (0)
     {
@@ -80,7 +109,7 @@ List get_fun_dl(List lib, const List name, const List desc)
         printf("result = %d\n", result); // 30
     }
 
-    return NIL_LIST;/* (List){
+    return true;/* (List){
         .tag = tag_foreign_function,
         .fun = fun_ptr
     }; */

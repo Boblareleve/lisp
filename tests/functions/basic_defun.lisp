@@ -1,7 +1,8 @@
 t
 (defun foo ((n)
+    (local r (+ n 1))
     ;;  (print n)
-    (+ n 1)
+    r
 ))
 (&&
     (== (foo 2) 3)

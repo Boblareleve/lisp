@@ -24,35 +24,37 @@ SET_IMPLEMENT_HASH_SET(void_ptr, ISNULL_VPTR, SETNULL_VPTR, 4, 0.8, 64);
 
 
 
-void *List_alloc(Lisp_context *ctx, size_t count)
+void *List_alloc(size_t count)
 {
     void *mem = calloc(count, 1);
     assert(((uintptr_t)mem & 0b1) == 0);
-    if (!ctx) // if no context -> allocation in the parsing phase the allocation will be register only on program startup
+    if (!g_ctx) // if no context -> allocation in the parsing phase the allocation will be register only on program startup
         return mem;
     
     
-    set_void_ptr_insert(&ctx->gc, mem);
+    set_void_ptr_insert(&g_ctx->gc, mem);
 
     return mem;
 }
 
-void *List_delc_alloc(Lisp_context *ctx, void *ptr, size_t count)
+void *List_delc_alloc(void *ptr, size_t count)
 {
     UNUSED(count);
     
     assert(((uintptr_t)ptr & 0b1) == 0);
 
-    if (!ctx)
+    if (!g_ctx)
         return ptr;
 
-    set_void_ptr_insert(&ctx->gc, ptr);
+    set_void_ptr_insert(&g_ctx->gc, ptr);
     return ptr;
 }
 
-void *List_duplicate(Lisp_context *ctx, const void *src, size_t count)
+void *List_duplicate(const void *src, size_t count)
 {
-    void *new = List_alloc(ctx, count);
+    void *new = List_alloc(count);
+    if (!new)
+        return NULL;
     return memcpy(new, src, count);
 }
 
@@ -84,22 +86,22 @@ int void_ptr_cmp(const void *a, const void *b)
     return *pa - *pb;
 }
 
-void gc_traverse_mark(Lisp_context *ctx, List li)
+void gc_traverse_mark(List li)
 {
     {
         void *ptr = List_get_ptr(&li);
         if (!ptr) return; // if not something allocated return
         
-        void **f = set_void_ptr_get(&ctx->gc, ptr);
+        void **f = set_void_ptr_get(&g_ctx->gc, ptr);
         if (!f)
         {
-            assert(set_void_ptr_contains(&ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
+            assert(set_void_ptr_contains(&g_ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
             return; // if it was not found -> already poisoned
         }
         
         *f = gc_tag(*f);
     }
-
+    
     if ((
         li.tag == ttag_any_type 
      && li.type_tag == tag_list 
@@ -107,7 +109,7 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
     )
      || li.tag == tag_list)
         for (int i = 0; i < li.size; i++)
-            gc_traverse_mark(ctx, li.list[i]);
+            gc_traverse_mark(li.list[i]);
 }
 
 
@@ -133,6 +135,7 @@ void gc_traverse_mark(Lisp_context *ctx, List li)
 //     }
 //     return true;
 // }
+
 void erase_untag(set_void_ptr *gc)
 {
     for (int i = 0; i < gc->capacity; i++)
@@ -164,88 +167,53 @@ void erase_untag(set_void_ptr *gc)
             }
         }
 }
-// void set_void_ptr_filter(set_void_ptr *gc, bool (*filter)(void_ptr), void *ctx, bool (*callback)(void *ctx, void_ptr))
-// {
-//     for (int i = 0; i < gc->capacity; i++)
-//         if (IS_NULL(gc->arr[i]) && !filter(gc->arr[i]))
-//         {
-//             callback(ctx, gc->arr[i]);
-//             SET_NULL(gc->arr[i]);
-//             gc->size--;
-//             i = (i + 1) % gc->capacity;
-//             while (IS_NULL(gc->arr[i]))
-//             {
-//                 if (!filter(gc->arr[i]))
-//                 {
-//                     callback(ctx, gc->arr[i]);
-//                     SET_NULL(gc->arr[i]);
-//                     i = (i + 1) % gc->capacity;
-//                     gc->size--;
-//                     continue;
-//                 }
-//                 int hash = _set_void_ptr_where(gc, gc->arr[i]);
-//                 if (i != hash)
-//                 {
-//                     gc->arr[hash] = gc->arr[i];
-//                     SET_NULL(gc->arr[i]);
-//                 }
-//                 i = (i + 1) % gc->capacity;
-//             }
-//         }
-// }
 
 
-void gc_tag_context(Lisp_context *ctx)
+void gc_tag_context(void)
 {
     // traverse code
-    gc_traverse_mark(ctx, ctx->root);
+    gc_traverse_mark(g_ctx->root);
 
-    // traverse stack
-    da_for (da_Variable, it, &ctx->args_stack)
+    // traverse vm stack
+    da_for (List, it, &g_ctx->vm_stack)
+        gc_traverse_mark(*it);
+    
+    // traverse stack ("named")
+    da_for (Variable, it, &g_ctx->stack)
     {
-        da_for (Variable, jt, it)
-        {
-            gc_traverse_mark(ctx, jt->name);
-            gc_traverse_mark(ctx, jt->value);
-        }
+        gc_traverse_mark(it->name);
+        gc_traverse_mark(it->value);
     }
 
     // traverse globale variables
-    set_for (Variable, it, &ctx->variables)
+    set_for (Variable, it, &g_ctx->variables)
     {
-        gc_traverse_mark(ctx, it->name);
-        gc_traverse_mark(ctx, it->value);
-    }
-
-    // traverse functions
-    set_for (Variable, it, &ctx->functions)
-    {
-        gc_traverse_mark(ctx, it->name);
-        gc_traverse_mark(ctx, it->value);
+        gc_traverse_mark(it->name);
+        gc_traverse_mark(it->value);
     }
 }
 
-bool garbage_collector(Lisp_context *ctx)
+bool garbage_collector(void)
 {
-    TRY(ctx);
+    TRY(g_ctx);
+    
+    gc_tag_context();
     
     
-    gc_tag_context(ctx);
+#ifdef GC_REPORT
+    size_t pointers_count = g_ctx->gc.size;
+#endif
+    
+    erase_untag(&g_ctx->gc);
 
-    size_t pointers_count = ctx->gc.size;
-    
-    erase_untag(&ctx->gc);
-
-    set_for (void_ptr, it, &ctx->gc)
+    set_for (void_ptr, it, &g_ctx->gc)
         *it = gc_untag(*it);
 
 #ifdef GC_REPORT
     printf("gc stats: %ld freed for %ld chunks (%.2lf%%) ", 
-        pointers_count - ctx->gc.size, pointers_count, 
-        (1.0 - (double)ctx->gc.size / pointers_count) * 100.0
+        pointers_count - g_ctx->gc.size, pointers_count, 
+        (1.0 - (double)g_ctx->gc.size / pointers_count) * 100.0
     );
-#else
-    (void)pointers_count;
 #endif
 
     return true;

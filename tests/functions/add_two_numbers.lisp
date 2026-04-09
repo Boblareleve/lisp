@@ -3,7 +3,7 @@ t
 ;;     (+ (first a) (first b))
 ;; ))
 
-(defun add ((a b)
+(defun add ((a list b list)
 
     (local res 0)
     
