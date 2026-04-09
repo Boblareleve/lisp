@@ -1,7 +1,11 @@
 t
+;; use types
 
+(global []= '((dest_array index value)
+    (= (&[] dest_array index) value)
+))
 
-(defun da_make ((n int list) (eval (list n) 0)))
+(defun da_make ((n int list) (eval (array n) 0)))
 
 (defun da_push ((obj list element any) 
     (local arr list ([] 0 obj))
@@ -25,7 +29,7 @@ t
 ))
 
 (defun da_slice ((obj list)
-    ([] ([] 0 obj) 0 (da_len obj))
+    ([] ([] 0 obj) 0 (da_len obj)) ; take a slice [0:len]
 ))
 
 (defun da_pop ((obj list)
@@ -33,7 +37,8 @@ t
 ))
 
 
-(local da (da_make 10))
+;; (local a 0)
+(local da ('((a) (1, 2)) 10))
 
 (print da)
 

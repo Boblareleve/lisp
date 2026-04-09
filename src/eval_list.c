@@ -400,10 +400,10 @@ bool primitive_assign(void)
     return false;
 }
 
-bool primitive_square_bracket(void)
+bool primitive_ref_square_bracket(void)
 {
-    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "[]"));
-    TRY(VM_top1.size == 3 || VM_top1.size == 4, error_log("expected 3 or 4 element for '[]' got %d", VM_top1.size));
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "&[]"));
+    TRY(VM_top1.size == 3 || VM_top1.size == 4, error_log("expected 3 or 4 element for '&[]' got %d", VM_top1.size));
     
     // List list = {0};
     VM_push(VM_top1.list[1]);
@@ -428,9 +428,6 @@ bool primitive_square_bracket(void)
         TRY(VM_top2.integer < VM_top1.integer && VM_top1.integer <= VM_top3.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top3.size));
 
         VM_top4 = List_sublist(VM_top3, VM_top2.integer, VM_top1.integer - VM_top2.integer);
-        // VM_top4.size = VM_top1.integer - VM_top2.integer; // [] '(1 2 3) 1 2 -> .size = 1  
-        // VM_top4.offset += VM_top2.integer;                //                 -> offset+1
-        // VM_top4.list   += VM_top2.integer;                //                 -> ptr + 1
         
         VM_pop; VM_pop; VM_pop;
         return true;
@@ -441,6 +438,39 @@ bool primitive_square_bracket(void)
         .list = &VM_top2.list[VM_top1.integer],
         .offset = VM_top1.integer
     };
+
+    VM_pop; VM_pop;
+    return true;
+}
+
+bool primitive_square_bracket(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "[]"));
+    TRY(VM_top1.size == 3 || VM_top1.size == 4, error_log("expected 3 or 4 element for '[]' got %d", VM_top1.size));
+    
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list, error_log("expected a list to index got %s", tag_to_string(VM_top1.tag)));
+
+    VM_push(VM_top2.list[2]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
+    TRY(0 <= VM_top1.integer && VM_top1.integer < VM_top2.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top2.size));
+
+    if (VM_top3.size == 4)
+    {
+        VM_push(VM_top3.list[3]);
+        TRY(eval());
+        TRY(VM_top1.tag == tag_integer, error_log("expected an index got %s", tag_to_string(VM_top1.tag)));
+        TRY(VM_top2.integer <= VM_top1.integer && VM_top1.integer <= VM_top3.size, error_log("out of bounds %d is not range of list of size %d", VM_top1.integer, VM_top3.size));
+        
+        VM_top4 = List_sublist(VM_top3, VM_top2.integer, VM_top1.integer - VM_top2.integer);
+        
+        VM_pop; VM_pop; VM_pop;
+        return true;
+    }
+    
+    VM_top3 = VM_top2.list[VM_top1.integer];
 
     VM_pop; VM_pop;
     return true;
@@ -483,15 +513,15 @@ bool primitive_exclamation_mark(void)
 bool primitive_if(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "if"));
-    TRY(VM_top1.size == 3, error_log("expected 3 element for 'if' got %d", VM_top1.size));
+    TRY(VM_top1.size >= 3, error_log("expected at least 3 element for 'if' got %d", VM_top1.size));
     VM_push(VM_top1.list[1]);
     TRY(eval());
     if (!IS_NIL(VM_top1))
-    {
-        VM_pop;
-        VM_top1 = VM_top1.list[2];
-        return eval();
-    }
+        for (int i = 2; i < VM_top2.size; i++)
+        {
+            VM_top1 = VM_top2.list[2];
+            TRY(eval());
+        }
     VM_pop;
     return true;
 }
@@ -1052,6 +1082,7 @@ bool primitive_typeof(void)
     return true;
 }
 
+// return an array of every element from index 1 of the list evaluated.
 bool primitive_eval(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "eval"));
@@ -1159,7 +1190,7 @@ bool primitive_list(void)
     return true;
 }
 
-// create an array of size n
+// create an array of size n fill of NIL_LIST
 bool primitive_array(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "array"));
@@ -1178,6 +1209,7 @@ bool primitive_array(void)
     return true;
 }
 
+// return a reference to a new memory with the element parameter as the value 
 bool primitive_reference(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "reference"));
@@ -1247,6 +1279,7 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
     { .name = _cstr_to_List("="),           .fun = primitive_assign             },
     { .name = _cstr_to_List("[]"),          .fun = primitive_square_bracket     },
+    { .name = _cstr_to_List("&[]"),         .fun = primitive_ref_square_bracket },
     { .name = _cstr_to_List("copy"),        .fun = primitive_copy               },
     { .name = _cstr_to_List("?"),           .fun = primitive_exclamation_mark   },
     { .name = _cstr_to_List("if"),          .fun = primitive_if                 },

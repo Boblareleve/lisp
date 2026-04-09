@@ -90,6 +90,7 @@ bool skip_atom(Strv *str)
 List escaping(Strv str)
 {
     char buffer[512];
+    buffer[0] = 0;
     Strv res = Strv_make(
         (str.size < (int)sizeof(buffer)) ? buffer : malloc(str.size), // fallback to malloc if too large
         0

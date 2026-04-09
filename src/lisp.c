@@ -169,7 +169,7 @@ bool eval_function(void)
     return true;
 }
 
-bool eval(void) //const List li, List *out)
+bool eval(void)
 {
     // dec ref count
     if (VM_top1.quote_count > 0)
@@ -190,12 +190,12 @@ bool eval(void) //const List li, List *out)
             TRY(eval_function(), error_log("failed to call inline function"));
             return true;
         }
-
-        // const List op = *li.list; 
-        TRY(VM_top1.list->tag == tag_symbole, error_log("unkown first list element primitive"));
+        
+        TRY(VM_top1.list[0].tag == tag_symbole, error_log("unkown first list element primitive"));
         
         primitive_t primitive = get_Primitive(VM_top1.list[0]);
         if (primitive) return primitive();
+
 
         Variable *var = get_Variable(VM_top1.list[0]);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", VM_top1.list->size, VM_top1.list->str));
