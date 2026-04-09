@@ -115,6 +115,9 @@ bool List_print(const List li)
 
     TRY(dump_indent(&to_print, li));
     fprintf(stdout, STRV_FMT, STRV_UNPACK(to_print.view));
+#ifdef DEBUG
+    fflush(stdout);
+#endif
     return true;
 }
 

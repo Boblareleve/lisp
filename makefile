@@ -1,4 +1,7 @@
+MAKEFLAGS += -j16
+
 .PHONY: all clean re san debug release tests
+
 
 
 CFLAGS=-I$(MY_LIB) -Wextra -Werror=incompatible-pointer-types -Wall -Wno-type-limits -Wno-missing-braces -Wno-address
@@ -31,7 +34,7 @@ $(OBJ_DIR):
 
 san: CFLAGS += -g3 -fsanitize=address,undefined
 san: $(OBJS_SAN)
-	gcc -o lisp_l $^ $(LFLAGS) $(CFLAGS)
+	gcc -o lisp_s $^ $(LFLAGS) $(CFLAGS)
 
 $(OBJ_DIR)/%.san.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	gcc -c -o $@ $< $(CFLAGS)

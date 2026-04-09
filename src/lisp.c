@@ -79,7 +79,7 @@ bool global_Variable(Variable var)
 bool push_stack_frame(void)
 {
     da_push(&g_ctx->stack, (Variable){
-        .name = _cstr_to_List(""),
+        .name = _cstr_to_List_symbole(""),
         .value = { .tag = ttag_frame },
         .type = ANY_TYPE
     });
@@ -90,6 +90,8 @@ bool push_stack_frame(void)
 bool pop_stack_frame(void)
 {
     while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
+        g_ctx->stack.size--;
+    if (g_ctx->stack.size > 0)
         g_ctx->stack.size--;
     return true;
 }
@@ -168,7 +170,7 @@ bool eval(void)
         return true;
     }
     if (VM_top1.tag == tag_list)
-    {    
+    {
         // nil|false
         if (IS_NIL(VM_top1))
             return true;
