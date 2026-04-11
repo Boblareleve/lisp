@@ -1,16 +1,16 @@
 t
-;; (defun get_sum ((a b)
-;;     (+ (first a) (first b))
-;; ))
+(global 'get_sum '((a b)
+    (+ (first a) (first b))
+))
 
-(defun add ((a list b list)
+(global 'add '((a list b list)
 
-    (local res 0)
+    (local 'res 0)
     
     (while (&& a b)
         (= res (* res 10))
-        ;; (local sum (get_sum a b))
-        (local sum (+ (first a) (first b)))
+        (local 'sum (get_sum a b))
+        ;; (local 'sum (+ (first a) (first b)))
         (= res (+ res sum))
         (= a (next a))
         (= b (next b))

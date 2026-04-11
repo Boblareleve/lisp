@@ -101,6 +101,7 @@ bool pop_stack_frame(void)
 bool eval_function(void)
 {
     TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
+    TRY(VM_top1.tag == tag_list, error_log("function definition not a list"));
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
     TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
     TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
@@ -114,7 +115,8 @@ bool eval_function(void)
         {
             VM_push(VM_top2.list[i+1]);
             {
-                TRY(eval(), pop_stack_frame());
+                if (VM_top2.list[0].list[i].quote_count == 0)
+                    TRY(eval(), pop_stack_frame());
                 
                 da_push(&g_ctx->stack, (Variable){
                     .name = VM_top2.list[0].list[i],

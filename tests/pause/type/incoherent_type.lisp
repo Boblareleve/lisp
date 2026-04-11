@@ -1,3 +1,3 @@
 ERROR
 
-(local a int 1.0)
+(local 'a int 1.0)

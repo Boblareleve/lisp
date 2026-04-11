@@ -1,6 +1,6 @@
 ;; '(0 1 1 2 3 5 8 13 21 34)
 t
-(defun fib ((n int int)
+(global 'fib '((n int int)
     ;; (print n "\n")
     
     (if (<= n 1) (return n))
@@ -11,7 +11,7 @@ t
 ))
 
 
-;; (local i 0)
+;; (local 'i 0)
 ;; (while (<= i 40)
 ;;     (print i  " " (fib i)  "\n")
 ;;     (++ i)

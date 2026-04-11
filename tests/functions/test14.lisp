@@ -1,3 +1,3 @@
 ()
-(defun inc ((a) (+ a 1)))
-(defun map ((foo, li) ()))
+(global 'inc '((a) (+ a 1)))
+(global 'map '((foo, li) ()))

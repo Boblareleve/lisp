@@ -251,45 +251,76 @@ static inline List List_stride(List li, uint16_t stride)
 }
 
 
+// take a local variable and bring it to the previous stack frame
+bool primitive_upgrade(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "upgrade"));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    
+    TRY(VM_top1.tag == tag_symbole, error_log("expected a symbole of variable but got %s", tag_to_string(VM_top1.tag)));
+    Variable *var = get_local_Variable(VM_top1);
+    TRY(var, error_log("variable %.*s not found or not local", var->name.size, var->name.str));
+    VM_top1 = NIL_LIST;
+
+    int idx = da_idx_for(var, &g_ctx->stack);
+    while (idx > 0)
+    {
+        SWAP(g_ctx->stack.arr[idx], g_ctx->stack.arr[idx-1]);
+        if (g_ctx->stack.arr[idx].value.tag == ttag_frame)
+            return true; // swap the marker
+        idx--;
+    }
+    // did not found a marker in the stack
+    error_log("already in root stack frame");
+    return false;
+}
+
 // create and initilize a local variable -> return is undefined
 bool primitive_local(void) // const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "local"));
-    // TRY(g_ctx->stack_allocation_allowed, error_log("can't create a variable in call arguments"));
+
     if (VM_top1.size == 3)
     { // (local NAME VALUE)
-        TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
+        VM_push(VM_top1.list[1]);
+        TRY(eval());
+        TRY(VM_top1.tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
         
-        VM_push(g_ctx->vm_stack.arr[g_ctx->vm_stack.size-1].list[2]);
+        VM_push(VM_top2.list[2]);
         TRY(eval());
         
         local_Variable((Variable){
-            .name = VM_top2.list[1],
+            .name = VM_top2,
             .type = ANY_TYPE,
             .value = VM_top1
         });
-        VM_pop;
+        VM_pop; VM_pop;
+
         VM_top1 = NIL_LIST;
         return true;
     }
     if (VM_top1.size == 4)
     { // (local NAME TYPE VALUE)
-        TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
+        VM_push(VM_top1.list[1]);
+        TRY(eval());
+        TRY(VM_top1.tag == tag_symbole, error_log("expected a symbole to local to got %s", tag_to_string(VM_top1.list[1].tag)));
 
-        VM_push(VM_top1.list[2]);
+        VM_push(VM_top2.list[2]);
         TRY(eval());
         TRY(VM_top1.tag == tag_type, error_log("expected a type at position 2 of local got %s", tag_to_string(VM_top1.tag)));
 
-        VM_push(VM_top2.list[3]);
+        VM_push(VM_top3.list[3]);
         TRY(eval());
         
         local_Variable((Variable){ 
-            .name = VM_top3.list[1],
+            .name = VM_top3,
             .type = VM_top2,
             .value = VM_top1
         });
-        VM_pop;
-        VM_pop;
+        VM_pop; VM_pop; VM_pop;
+
         VM_top1 = NIL_LIST;
         return true;
     }
@@ -298,49 +329,50 @@ bool primitive_local(void) // const List li, List *out)
     return false;
 }
 
-
 // create and initilize a global variable
 bool primitive_global(void) // const List li, List *out)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "global"));
     TRY(VM_top1.size == 3, error_log("expected 3 element for 'global' got %d", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'global' to got %s", tag_to_string(VM_top1.list[1].tag)));
 
-    VM_push(VM_top1.list[2]);
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_symbole, error_log("expected a symbole to 'global' to got %s", tag_to_string(VM_top1.list[1].tag)));
+
+    VM_push(VM_top2.list[2]);
     TRY(eval());
     
     Variable var = {
-        .name = VM_top2.list[1], 
+        .name = VM_top2, 
         .type = ANY_TYPE,
         .value = VM_top1
     };
-    TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
-    VM_pop;
+    TRY(global_Variable(var), error_log("global variable %.*s already exist", STRV_UNPACK(List_to_Strv(var.name))));
+    VM_pop; VM_pop;
+
     VM_top1 = NIL_LIST;
     return true;
 }
 
 // same as global but don't eval argument 
-bool primitive_defun(void) // const List li, List *out)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "defun"));
-    TRY(VM_top1.size == 3, error_log("expected 3 element for 'defun' got %d elements", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'defun' to got %s", tag_to_string(VM_top1.list[1].tag)));
-
-    Variable var = {
-        .name = VM_top1.list[1],
-        .value = VM_top1.list[2],
-        .type = ANY_TYPE
-    };
-    // set or replace function var.name
-    TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
-
-    VM_top1 = NIL_LIST;
-    return true;
-}
+// bool primitive_defun(void) // const List li, List *out)
+// {
+//     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "defun"));
+//     TRY(VM_top1.size == 3, error_log("expected 3 element for 'defun' got %d elements", VM_top1.size));
+//     TRY(VM_top1.list[1].tag == tag_symbole, error_log("expected a symbole to 'defun' to got %s", tag_to_string(VM_top1.list[1].tag)));
+//     Variable var = {
+//         .name = VM_top1.list[1],
+//         .value = VM_top1.list[2],
+//         .type = ANY_TYPE
+//     };
+//     // set or replace function var.name
+//     TRY(global_Variable(var), error_log("global variable %sv already exist", List_to_Strv(var.name)));
+//     VM_top1 = NIL_LIST;
+//     return true;
+// }
 
 // false on not found
-bool mutate_Variable(Variable var)
+/* bool mutate_Variable(Variable var)
 {
     Variable *old = get_Variable(var.name);
     if (old)
@@ -351,8 +383,9 @@ bool mutate_Variable(Variable var)
     }
     return false;
 }
+ */
 
-// change value of a variable
+ // change value of a variable
 bool primitive_assign(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "="));
@@ -615,28 +648,60 @@ bool primitive_increment(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "++"));
     TRY(VM_top1.size == 2, error_log("expected 2 elements for '++' got %d", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("can only increment variable got %s", tag_to_string(VM_top1.list[1].tag)));
+
+    if (VM_top1.list[1].tag == tag_symbole)
+    {
+        Variable *to_inc = get_Variable(VM_top1.list[1]);
+        TRY(to_inc, error_log("variable \"%.*s\" to increment not found", VM_top1.list[1].size, VM_top1.list[1].str));
+        TRY(to_inc->value.tag == tag_integer, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
+        to_inc->value.integer += 1;
+        VM_top1 = to_inc->value;
+        return true;
+    }
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    if (VM_top1.tag == tag_reference)
+    {
+        assert(VM_top1.list);
+        ++VM_top1.list->integer;
+        VM_top2 = *VM_top1.list;
+        VM_pop;
+        return true;
+    }
+    VM_pop;
     
-    Variable *to_inc = get_Variable(VM_top1.list[1]);
-    TRY(to_inc, error_log("variable \"%.*s\" to increment not found", VM_top1.list[1].size, VM_top1.list[1].str));
-    TRY(to_inc->value.tag == tag_integer, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
-    to_inc->value.integer += 1;
-    VM_top1 = to_inc->value;
-    return true;
+    error_log("can only increment variable or reference got %s", tag_to_string(VM_top1.list[1].tag));
+    return false;
 }
 
 bool primitive_decrement(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "--"));
     TRY(VM_top1.size == 2, error_log("expected 2 elements for '==' got %d", VM_top1.size));
-    TRY(VM_top1.list[1].tag == tag_symbole, error_log("can only decrement variable got %s", tag_to_string(VM_top1.list[1].tag)));
 
-    Variable *to_dec = get_Variable(VM_top1.list[1]);
-    TRY(to_dec, error_log("variable \"%.*s\" to decrement not found", VM_top1.list[1].size, VM_top1.list[1].str));
-    TRY(to_dec->value.tag == tag_integer, error_log("try to decrement %s", tag_to_string(to_dec->value.tag)));
-    to_dec->value.integer -= 1;
-    VM_top1 = to_dec->value;
-    return true;
+    if (VM_top1.list[1].tag == tag_symbole)
+    {
+        Variable *to_inc = get_Variable(VM_top1.list[1]);
+        TRY(to_inc, error_log("variable \"%.*s\" to decrement not found", VM_top1.list[1].size, VM_top1.list[1].str));
+        TRY(to_inc->value.tag == tag_integer, error_log("try to decrement %s", tag_to_string(to_inc->value.tag)));
+        to_inc->value.integer -= 1;
+        VM_top1 = to_inc->value;
+        return true;
+    }
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    if (VM_top1.tag == tag_reference)
+    {
+        assert(VM_top1.list);
+        --VM_top1.list->integer;
+        VM_top2 = *VM_top1.list;
+        VM_pop;
+        return true;
+    }
+    VM_pop;
+    
+    error_log("can only decrement variable got %s", tag_to_string(VM_top1.list[1].tag));
+    return false;
 }
 
 bool primitive_minus(void)
@@ -1273,10 +1338,14 @@ SET_TYPEDEF_HASH_SET(Primitive);
 SET_IMPLEMENT_HASH_SET(Primitive, SET_PRIM_IS_NULL, SET_PRIM_SET_NULL, 2, 0.7, 64);
 
 
+
+
+
 static const Primitive keys[] = {
+    // { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
     { .name = _cstr_to_List("local"),       .fun = primitive_local              },
+    { .name = _cstr_to_List("upgrade"),     .fun = primitive_upgrade            },
     { .name = _cstr_to_List("global"),      .fun = primitive_global             },
-    { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
     { .name = _cstr_to_List("="),           .fun = primitive_assign             },
     { .name = _cstr_to_List("[]"),          .fun = primitive_square_bracket     },
     { .name = _cstr_to_List("&[]"),         .fun = primitive_ref_square_bracket },

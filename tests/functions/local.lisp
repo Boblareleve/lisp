@@ -1,7 +1,7 @@
 t
 
 ('((n)
-    (local a 0)
+    (local 'a 0)
     0
 ) 0)
 

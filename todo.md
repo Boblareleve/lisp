@@ -24,3 +24,5 @@
  + hash table object
  + variatic function arguments the special variable '...' 
    get encapsulated into a ... roulement de tambour ... a list ; exemple  '((...) (len ...))
+
+ + make primitive to be powerful and let user make wrapper function to have convinent way of using the funtionnality ?

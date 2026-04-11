@@ -1,5 +1,5 @@
 ERROR
-(defun foo ((1 a)
+(global 'foo '((1 a)
     0
 ))
 

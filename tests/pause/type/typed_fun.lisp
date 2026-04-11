@@ -1,6 +1,6 @@
 2
 
-(defun foo ((n int int)
+(global 'foo '((n int int)
     (++ n)
 ))
 

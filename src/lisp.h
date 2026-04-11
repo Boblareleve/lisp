@@ -66,15 +66,15 @@ typedef struct
 typedef struct List List;
 
 
-// maybe get down to 8 bytes using uint32_t for indexing into a pool
 struct List
 {
     List_tag tag;
     uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
     List_tag type_tag;   // for type only
+    uint8_t __pad[1];    // padding
 
     uint16_t offset; // only to get back the start of the allocated chunk
-    uint16_t size;
+    uint16_t size;   // count of bytes in string/symbole or List in a list
     
     union {
         List *list;
