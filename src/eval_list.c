@@ -318,6 +318,7 @@ bool primitive_local(void)
         VM_push(VM_top3.list[3]);
         TRY(eval());
         
+        TRY(is_of_type(VM_top1, VM_top2), error_log("uncompatible type"));
         local_Variable((Variable){ 
             .name = VM_top3,
             .type = VM_top2,

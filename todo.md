@@ -16,6 +16,7 @@
  + type
     - typeof list -> TYPE
     - how to handle list/tuple 
+    - T1 | T2
 
  + test: global variable colision
 

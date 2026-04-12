@@ -110,37 +110,62 @@ bool pop_stack_frame(void)
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
 {
+    
+    
     TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
     TRY(VM_top1.tag == tag_list, error_log("function definition not a list"));
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
     TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
     TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
     
+    
     List return_type = ANY_TYPE;
     
-    {
+    VM_push(NIL_LIST); { // parse and check arguments
+        #define EF_VM_arg_call(i) (VM_top3.list[i+1])
+        #define EF_VM_arg_call_count (VM_top3.size - 1)
+        #define EF_VM_arg_def(i) (VM_top2.list[0].list[i])
+        #define EF_VM_arg_def_count (VM_top2.list[0].size)
+
         static da_Variable args = {0};
         args.size = 0;
         
-        for (int i = 0; i < VM_top1.list[0].size; i++)
+        bool last_argument_have_hint = true;
+        for (int i = 0; i < EF_VM_arg_def_count; i++)
         {
-            VM_push(VM_top2.list[i+1]);
+            Variable *s = get_global_Variable(EF_VM_arg_def(i));
+            if (s && s->type.tag == tag_type && s->type.type_tag == tag_type)
             {
-                if (VM_top2.list[0].list[i].quote_count == 0)
-                    TRY(eval());
-                
-                da_push(&args, (Variable){
-                    .name = VM_top2.list[0].list[i],
-                    .type = ANY_TYPE, // TODO types
-                    .value = VM_top1
-                });
+                if (last_argument_have_hint)
+                { // function type
+                    TRY(i+1 == EF_VM_arg_def_count, error_log("two type not at the end")); // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
+                    TRY(args.size == EF_VM_arg_call_count);
+                    return_type = s->value;
+                    continue;
+                }
+                da_top(&args).type = s->value;
+                TRY(is_of_type(da_top(&args).value, da_top(&args).type), error_log("argument %d did not match it's type hint", args.size-1));
+                last_argument_have_hint = true;
+                continue;
             }
-            VM_pop;
+            
+            TRY(args.size < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
+            VM_top1 = EF_VM_arg_call(args.size);
+            if (EF_VM_arg_def(i).quote_count == 0)
+                TRY(eval());
+            
+            da_push(&args, (Variable){
+                .name = EF_VM_arg_def(i),
+                .type = ANY_TYPE,
+                .value = VM_top1
+            });
+            
+            last_argument_have_hint = false;
         }
         
         push_stack_frame();
         da_push_da(&g_ctx->stack, &args);
-    }
+    } VM_pop;
 
 
     const int vm_stack_sp = g_ctx->vm_stack.size;
