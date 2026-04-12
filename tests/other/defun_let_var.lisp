@@ -1,3 +1,5 @@
+t
+
 ; to define a global 'function
 (global 'defun '(('name 'fun) (global name fun) ))
 ; to define a local 'variable
