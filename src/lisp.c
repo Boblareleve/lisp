@@ -26,7 +26,7 @@ SET_IMPLEMENT_HASH_SET(Variable, VAR_IS_NULL, VAR_SET_NULL, 4, 0.8, 64);
 
 Variable *get_local_Variable(List name)
 {   
-    for (int i = g_ctx->stack.size - 1; i >= 0; i--)
+    for (int i = g_ctx->stack.size - 1; i >= g_ctx->frame_start; i--)
     {
         TRY(g_ctx->stack.arr[i].name.tag == tag_symbole);
         if (List_str_equal(g_ctx->stack.arr[i].name, name))
@@ -52,7 +52,7 @@ Variable *get_Variable(List name)
 // return index in the call stack
 size_t local_Variable(Variable var)
 {
-    for (int i = g_ctx->stack.size-1; i >= 0; i--)
+    for (int i = g_ctx->stack.size-1; i >= g_ctx->frame_start; i--)
     {
         if (List_str_equal(g_ctx->stack.arr[i].name, var.name))
         {
@@ -78,21 +78,31 @@ bool global_Variable(Variable var)
 
 bool push_stack_frame(void)
 {
+    assert(g_ctx);
+
     da_push(&g_ctx->stack, (Variable){
         .name = _cstr_to_List_symbole(""),
-        .value = { .tag = ttag_frame },
+        .value = { .tag = ttag_frame, .integer = g_ctx->frame_start },
         .type = ANY_TYPE
     });
+    g_ctx->frame_start = g_ctx->stack.size;
     return true;
 }
 
 // push a marker to pop to (do linear search as it can be mouved)
 bool pop_stack_frame(void)
 {
-    while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
-        g_ctx->stack.size--;
-    if (g_ctx->stack.size > 0)
-        g_ctx->stack.size--;
+    assert(g_ctx);
+
+    TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+    g_ctx->stack.size = g_ctx->frame_start-1;
+    assert(g_ctx->stack.arr[g_ctx->stack.size].value.tag == ttag_frame);
+    g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+
+    // while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
+    //     g_ctx->stack.size--;
+    // if (g_ctx->stack.size > 0)
+    //     g_ctx->stack.size--;
     return true;
 }
 
@@ -109,16 +119,17 @@ bool eval_function(void)
     List return_type = ANY_TYPE;
     
     {
-        push_stack_frame();
-
+        static da_Variable args = {0};
+        args.size = 0;
+        
         for (int i = 0; i < VM_top1.list[0].size; i++)
         {
             VM_push(VM_top2.list[i+1]);
             {
                 if (VM_top2.list[0].list[i].quote_count == 0)
-                    TRY(eval(), pop_stack_frame());
+                    TRY(eval());
                 
-                da_push(&g_ctx->stack, (Variable){
+                da_push(&args, (Variable){
                     .name = VM_top2.list[0].list[i],
                     .type = ANY_TYPE, // TODO types
                     .value = VM_top1
@@ -126,6 +137,9 @@ bool eval_function(void)
             }
             VM_pop;
         }
+        
+        push_stack_frame();
+        da_push_da(&g_ctx->stack, &args);
     }
 
 
@@ -141,8 +155,8 @@ bool eval_function(void)
             {
                 reset_error(); // need to find solution for that
                 g_ctx->in_return = false; // not in return anymore
-                pop_stack_frame();
-
+                TRY(pop_stack_frame());
+                
                 // pop vm_stack frame
                 g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
                 g_ctx->vm_stack.size = vm_stack_sp-1;
@@ -159,7 +173,7 @@ bool eval_function(void)
     TRY(eval(), pop_stack_frame());
     TRY(is_of_type(VM_top1, return_type), pop_stack_frame(); error_log("function return unexpected type"));
     
-    pop_stack_frame();
+    TRY(pop_stack_frame());
     return true;
 }
 

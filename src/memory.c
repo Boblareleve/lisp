@@ -27,7 +27,7 @@ SET_IMPLEMENT_HASH_SET(void_ptr, ISNULL_VPTR, SETNULL_VPTR, 4, 0.8, 64);
 void *List_alloc(size_t count)
 {
     void *mem = calloc(count, 1);
-    assert(((uintptr_t)mem & 0b1) == 0);
+    assert(mem && ((uintptr_t)mem & 0b1) == 0); // make sure it can be taged
     if (!g_ctx) // if no context -> allocation in the parsing phase the allocation will be register only on program startup
         return mem;
     

@@ -115,7 +115,7 @@ typedef struct Lisp_context
 
     // stack (local)
     da_Variable stack;
-    
+    int frame_start;
     // bool stack_allocation_allowed;
     bool in_return; // indicate that the error is only a return mechanism
                     // see with vm_stack

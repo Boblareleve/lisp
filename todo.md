@@ -24,5 +24,7 @@
  + hash table object
  + variatic function arguments the special variable '...' 
    get encapsulated into a ... roulement de tambour ... a list ; exemple  '((...) (len ...))
+   can have a name exemple: args... but need to end with '...' and is use whiout them args
+   '... 
 
  + make primitive to be powerful and let user make wrapper function to have convinent way of using the funtionnality ?
