@@ -271,7 +271,10 @@ bool primitive_upgrade(void)
     {
         SWAP(g_ctx->stack.arr[idx], g_ctx->stack.arr[idx-1]);
         if (g_ctx->stack.arr[idx].value.tag == ttag_frame)
+        {
+            g_ctx->frame_start++; 
             return true; // swap the marker
+        }
         idx--;
     }
     // did not found a marker in the stack

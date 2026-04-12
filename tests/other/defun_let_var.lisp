@@ -1,11 +1,11 @@
 t
 
 ; to define a global 'function
-(global 'defun '(('name 'fun) (global name fun) ))
+(global 'defun '(('name 'fun)  (global name fun) ))
 ; to define a local 'variable
-(global 'let   '(('name value) (local name value) (upgrade name)))
+(global 'let   '(('name value) (local name value) (upgrade name) ))
 ; to define a global 'variable
-(global 'var   '(('name value) (global name value)))
+(global 'var   '(('name value) (global name value) ))
 
 
 
@@ -17,4 +17,10 @@ t
 
 (let c 2)
 
-(== (foo g) 1)
+(==
+    (foo g)
+    (- (foo cc) cc)
+    (- (foo c)  c)
+    (foo b)
+    1
+)
