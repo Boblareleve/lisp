@@ -1,7 +1,5 @@
-t
-
 ; to define a global 'function
-(global 'defun '(('name 'fun)  (global name fun) ))
+(global 'defun '(('name 'fun) (global name fun) ))
 ; to define a local 'variable
 (global 'let   '(('name value) (local name value) (upgrade name) ))
 ; to define a global 'variable
@@ -9,20 +7,9 @@ t
 
 
 
+;; (defun foo (() ()))
+(global 'foo '(() ()))
 
-
-(defun foo ((a) (+ a 1)))
-(let b 0)
-(var g b)
-
-(local 'cc 1)
-
-(let c b)
-
-(==
-    (foo g)
-    (- (foo cc) cc)
-    (- (foo c)  c)
-    (foo b)
-    1
-)
+;; (let a 0)
+(var da (foo)) ; (da_make 8))
+;; (local 'da (foo)) ; (da_make 8))

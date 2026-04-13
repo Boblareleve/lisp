@@ -89,7 +89,7 @@ int void_ptr_cmp(const void *a, const void *b)
 void gc_traverse_mark(List li)
 {
     {
-        void *ptr = List_get_ptr(&li);
+        void *ptr = List_get_ptr(li);
         if (!ptr) return; // if not something allocated return
         
         void **f = set_void_ptr_get(&g_ctx->gc, ptr);

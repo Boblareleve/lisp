@@ -314,7 +314,7 @@ bool primitive_local(void)
         VM_push(VM_top2.list[2]);
         TRY(eval());
         TRY(VM_top1.tag == tag_type, error_log("expected a type at position 2 of local got %s", tag_to_string(VM_top1.tag)));
-
+        
         VM_push(VM_top3.list[3]);
         TRY(eval());
         
@@ -1179,6 +1179,24 @@ bool primitive_quote(void)
     return true;
 }
 
+bool primitive_dollar(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "$"));
+    TODO("$");
+    /* TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
+
+    TRY(eval(li.list[1], &res));
+
+    for (int i = 2; i < li.size; i++)
+    {
+    }
+    *out = res; */
+    return true;
+}
+
+
+/* Types */
+
 bool primitive_typeof(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "typeof"));
@@ -1219,22 +1237,6 @@ bool primitive_type(void)
     
     return true;
 }
-
-bool primitive_dollar(void)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "$"));
-    TODO("$");
-    /* TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
-
-    TRY(eval(li.list[1], &res));
-
-    for (int i = 2; i < li.size; i++)
-    {
-    }
-    *out = res; */
-    return true;
-}
-
 
 
 

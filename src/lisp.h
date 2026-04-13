@@ -8,7 +8,6 @@
 #include "utils.h"
 #include "sets.h"
 #include <stdlib.h>
-// #include <setjmp.h>
 #include <ffi.h>
 
 #define AR_MAX_ALIGN 8
@@ -147,12 +146,13 @@ typedef struct Lisp_context
 
 
 
-// extern Strb error;
+extern Strb static_error;
 #define error_log(msg, ...)\
 do {\
-    if (g_ctx->error.size > 0) Strb_cat(&g_ctx->error, "\n");\
-    Strb_catf(&g_ctx->error, "%s:%s:%d: ", __FILE__, __func__, __LINE__);\
-    Strb_catf(&g_ctx->error, msg __VA_OPT__(,) __VA_ARGS__);\
+    Strb *_error = (g_ctx) ? &g_ctx->error : &static_error;\
+    if (_error->size > 0) Strb_cat(_error, "\n");\
+    Strb_catf(_error, "%s:%s:%d: ", __FILE__, __func__, __LINE__);\
+    Strb_catf(_error, msg __VA_OPT__(,) __VA_ARGS__);\
 } while (0)
 #define get_error() (g_ctx ? g_ctx->error.view : (void)0)
 #define reset_error() (g_ctx ? g_ctx->error.size = 0 : (void)0)
@@ -174,15 +174,15 @@ static inline const char *tag_to_string(int tag)
     };
     return table[tag];
 }
-static inline void *List_get_ptr(const List *li)
+static inline void *List_get_ptr(const List li)
 {
-    assert(li->tag != tag_foreign_function || li->offset == 0); // tag_foreign_function -> .offset == 0
-    if (li->tag == tag_list
-     || li->tag == tag_foreign_function
-     || li->tag == tag_reference)
-        return (void*)(li->list - (uintptr_t)li->offset);
-    if (li->tag == tag_symbole || li->tag == tag_string)
-        return (void*)(li->str - (uintptr_t)li->offset);
+    assert(li.tag != tag_foreign_function || li.offset == 0); // tag_foreign_function -> .offset == 0
+    if (li.tag == tag_list
+     || li.tag == tag_foreign_function
+     || li.tag == tag_reference)
+        return (void*)(li.list - (uintptr_t)li.offset);
+    if (li.tag == tag_symbole || li.tag == tag_string)
+        return (void*)(li.str - (uintptr_t)li.offset);
     
     return NULL;
 }
@@ -207,7 +207,7 @@ bool List_print(const List li);
 // lisp.c
 bool eval(void); //const List li, List *out);
 bool List_equal(const List li1, const List li2);
-void List_free(List *li);
+void List_free(List li);
 List List_copy(const List li);
 Lisp_context *Lisp_context_init(List root);
 void set_Lisp_context(Lisp_context *ctx);

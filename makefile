@@ -68,9 +68,11 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 
 
-DIR ?= *
+# DIR ?= *
 EXE ?= lisp_s
+FILES ?= $(shell find ./tests/unit -type f)
 tests: san
-	./$(EXE) tests/$(DIR)/*.lisp
+	./$(EXE) $(FILES)
+# tests/$(DIR)/*.lisp
 
 

@@ -3,7 +3,7 @@
 #include "lisp.h"
 
 
-// Strb error = {0};
+Strb static_error = {0};
 Lisp_context *g_ctx = NULL;
 
 #define VAR_IS_NULL(var)  ((var).name.str == NULL)
@@ -110,8 +110,6 @@ bool pop_stack_frame(void)
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
 {
-    
-    
     TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
     TRY(VM_top1.tag == tag_list, error_log("function definition not a list"));
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
@@ -128,7 +126,8 @@ bool eval_function(void)
         #define EF_VM_arg_def_count (VM_top2.list[0].size)
 
         static da_Variable args = {0};
-        args.size = 0;
+        int args_point = args.size;
+        // args.size = 0;
         
         bool last_argument_have_hint = true;
         for (int i = 0; i < EF_VM_arg_def_count; i++)
@@ -139,18 +138,18 @@ bool eval_function(void)
                 if (last_argument_have_hint)
                 { // function type
                     TRY(i+1 == EF_VM_arg_def_count, error_log("two type not at the end")); // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
-                    TRY(args.size == EF_VM_arg_call_count);
+                    TRY(args.size - args_point == EF_VM_arg_call_count);
                     return_type = s->value;
                     continue;
                 }
                 da_top(&args).type = s->value;
-                TRY(is_of_type(da_top(&args).value, da_top(&args).type), error_log("argument %d did not match it's type hint", args.size-1));
+                TRY(is_of_type(da_top(&args).value, da_top(&args).type), error_log("argument %d did not match it's type hint", args.size - args_point - 1));
                 last_argument_have_hint = true;
                 continue;
             }
             
-            TRY(args.size < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
-            VM_top1 = EF_VM_arg_call(args.size);
+            TRY(args.size - args_point < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
+            VM_top1 = EF_VM_arg_call(args.size - args_point);
             if (EF_VM_arg_def(i).quote_count == 0)
                 TRY(eval());
             
@@ -159,12 +158,16 @@ bool eval_function(void)
                 .type = ANY_TYPE,
                 .value = VM_top1
             });
+            if (EF_VM_arg_def(i).quote_count != 0)
+                da_top(&args).name.quote_count--;
             
             last_argument_have_hint = false;
         }
         
         push_stack_frame();
-        da_push_da(&g_ctx->stack, &args);
+        for (int i = args_point; i < args.size; i++)
+            da_push(&g_ctx->stack, args.arr[i]);
+        args.size = args_point;
     } VM_pop;
 
 
@@ -232,7 +235,6 @@ bool eval(void)
 
         Variable *var = get_Variable(VM_top1.list[0]);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", VM_top1.list->size, VM_top1.list->str));
-        // TODO("eval_fun");
         VM_push(var->value);
         TRY(eval_function());
         return true;
@@ -307,27 +309,24 @@ List List_copy(const List li)
     return li;
 }
 
-
 // !!shortcut GC!!
-void List_free(List *li)
-{
-    if (!li) return ;
-    
-    if (li->tag == tag_list)
+void List_free(List li)
+{    
+    if (li.tag == tag_list)
     {
-        if (IS_NIL(*li)) return ;
-
-        for (size_t i = 0; i < li->size; i++)
-            List_free(&li->list[i]);
+        for (size_t i = 0; i < li.size; i++)
+            List_free(li.list[i]);
     }
+    
+    assert(!IS_NIL(li) || li.list == NULL);
     free(List_get_ptr(li));
 }
 
 
 set_void_ptr add_to_gc_context(set_void_ptr gc, List root)
 {
-    if (List_get_ptr(&root))
-        set_void_ptr_insert(&gc, List_get_ptr(&root));
+    if (List_get_ptr(root))
+        set_void_ptr_insert(&gc, List_get_ptr(root));
 
     if (root.tag == tag_list)
         for (int i = 0; i < root.size; i++)
@@ -367,6 +366,8 @@ void set_Lisp_context(Lisp_context *ctx)
 
 void Lisp_context_free(void)
 {
+    assert(g_ctx);
+    // if (!g_ctx) return;
     { // free memory not tracked by gc
         da_free(&g_ctx->stack);
         da_free(&g_ctx->vm_stack);
