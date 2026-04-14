@@ -140,83 +140,91 @@ bool test(const Strv str)
         Strb_free(static_error);
     }
     
-    TRY(root.list[0].tag == tag_symbole, fprintf(fd, "expected a symbole to indicate test type"));
-
+    
     set_Lisp_context(Lisp_context_init(root));
-
-
-    if (List_equal_lit(root.list[0], "PARSE")) // do not run
+    
+    if (root.list[0].tag == tag_symbole) //, fprintf(fd, "expected a symbole to indicate test type"));
     {
-        Lisp_context_free();
-        return true;
-    }
-    if (List_equal_lit(root.list[0], "ERROR")) // expect an error to occure
-    {
-        for (int i = 1; i < root.size; i++)
+        if (List_equal_lit(root.list[0], "PARSE")) // do not run
         {
-            VM_push(root.list[i]);
-            if (!eval())
+            Lisp_context_free();
+            return true;
+        }
+        if (List_equal_lit(root.list[0], "ERROR")) // expect an error to occure
+        {
+            for (int i = 1; i < root.size; i++)
             {
+                VM_push(root.list[i]);
+                if (!eval())
+                {
+                    Lisp_context_free();
+                    return true;
+                }
+                VM_pop;
+            }
+            fprintf(fd, "no error while expecting one\t");
+            Lisp_context_free();
+            return false;
+        }
+        if (List_equal_lit(root.list[0], "EQUAL")) // expect to finish with the same value as the next one
+        {
+            VM_push(root.list[1]);
+            TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
+            List first = VM_top1;
+            VM_pop;
+
+            VM_push(NIL_LIST);
+            for (int i = 2; i < root.size; i++)
+            {
+                VM_top1 = root.list[i];
+                TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
+            }
+            List last = VM_top1;
+            VM_pop;
+
+            if (!List_equal(first, last))
+            {
+                fprintf(fd, "expected: ");
+                List_print(first);
+                fprintf(fd, " got ");
+                List_print(last);
+                fprintf(fd, "\"");
                 Lisp_context_free();
-                return true;
+                return false;
+            }
+            Lisp_context_free();
+            return true;
+        }
+        if (List_equal_lit(root.list[0], "TRUE")) // finish with true value
+        {
+            VM_push(NIL_LIST);
+            for (int i = 1; i < root.size; i++)
+            {
+                VM_top1 = root.list[i];
+                TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
+            }
+            if (VM_top1.tag != tag_true)
+            {
+                fprintf(fd, "expected true got: ");
+                List_print(VM_top1);
+                Lisp_context_free();
+                return false;
             }
             VM_pop;
+            Lisp_context_free();
+            return true;
         }
-        fprintf(fd, "no error while expecting one\t");
-        Lisp_context_free();
-        return false;
     }
-    if (List_equal_lit(root.list[0], "EQUAL")) // expect to finish with the same value as the next one
+    
+    VM_push(NIL_LIST);
+    for (int i = 0; i < root.size; i++)
     {
-        VM_push(root.list[1]);
+        VM_top1 = root.list[i];
         TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
-        List first = VM_top1;
-        VM_pop;
-
-        VM_push(NIL_LIST);
-        for (int i = 2; i < root.size; i++)
-        {
-            VM_top1 = root.list[i];
-            TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
-        }
-        List last = VM_top1;
-        VM_pop;
-
-        if (!List_equal(first, last))
-        {
-            fprintf(fd, "expected: ");
-            List_print(first);
-            fprintf(fd, " got ");
-            List_print(last);
-            fprintf(fd, "\"");
-            Lisp_context_free();
-            return false;
-        }
-        Lisp_context_free();
-        return true;
     }
-    if (List_equal_lit(root.list[0], "TRUE")) // finish with true value
-    {
-        VM_push(NIL_LIST);
-        for (int i = 1; i < root.size; i++)
-        {
-            VM_top1 = root.list[i];
-            TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
-        }
-        if (VM_top1.tag != tag_true)
-        {
-            fprintf(fd, "expected true got: ");
-            List_print(VM_top1);
-            Lisp_context_free();
-            return false;
-        }
-        VM_pop;
-        Lisp_context_free();
-        return true;
-    }
-    fprintf(fd, "unreconized test type %.*s", root.list[0].size, root.list[0].str);
+    VM_pop;
     Lisp_context_free();
-    return false;
+    return true;
 }
 
 int main(int argc, char **argv)
@@ -238,14 +246,24 @@ int main(int argc, char **argv)
         fprintf(fd, "TEST %-*s\t", 64, argv[i]);
         fflush(fd);
         
-        clock_t time_start = clock();
-        bool res = test(raw.view);
-        clock_t time_end = clock();
+        int samples_count = 1;
+        clock_t time;
+        bool res = true;
+        TIME(time)
+        {
+            for (int i = 0; res && i < samples_count; i++)
+                res = test(raw.view);
+        }
         if (!res)
             fprintf(fd, "\tFAILURE");
         else
             fprintf(fd, "SUCCESS");
-        fprintf(fd, "  %lfms\n", 1000 * (double)(time_end - time_start) / CLOCKS_PER_SEC);
+
+        time /= samples_count;
+        if (time >= CLOCKS_PER_SEC/1000)
+            fprintf(fd, "  %.3lfms\n", (double)time * (1000.0 / CLOCKS_PER_SEC));
+        else
+            fprintf(fd, "  %liµs\n", time * (clock_t)(1000 * 1000 / CLOCKS_PER_SEC));
         
         Strb_free(raw);
     }

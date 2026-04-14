@@ -31,27 +31,30 @@ $(OBJ_DIR):
 	mkdir $(OBJ_DIR)
 
 
+san: lisp_s
 
-san: CFLAGS += -g3 -fsanitize=address,undefined
-san: $(OBJS_SAN)
+lisp_s: CFLAGS += -g3 -fsanitize=address,undefined
+lisp_s: $(OBJS_SAN)
 	gcc -o lisp_s $^ $(LFLAGS) $(CFLAGS)
 
 $(OBJ_DIR)/%.san.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	gcc -c -o $@ $< $(CFLAGS)
 
 
+debug: lisp_d
 
-debug: CFLAGS += -ggdb
-debug: $(OBJS_DEBUG)
+lisp_d: CFLAGS += -ggdb
+lisp_d: $(OBJS_DEBUG)
 	gcc -o lisp_d $^ $(LFLAGS) $(CFLAGS)
 
 $(OBJ_DIR)/%.debug.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	gcc -c -o $@ $< $(CFLAGS)
 
 
+release: lisp_r
 
-release: CFLAGS += -O1
-release: $(OBJS_RELEASE)
+lisp_r: CFLAGS += -O3
+lisp_r: $(OBJS_RELEASE)
 	gcc -o lisp_r $^ $(LFLAGS) $(CFLAGS)
 
 $(OBJ_DIR)/%.release.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
@@ -71,7 +74,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 # DIR ?= *
 EXE ?= lisp_s
 FILES ?= ../$(shell find ./tests/unit -type f)
-tests: san
+tests: $(EXE)
 	@./$(EXE) ./tests/$(FILES)
 
 

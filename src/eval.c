@@ -567,6 +567,13 @@ bool primitive_increment(void)
     {
         Variable *to_inc = get_Variable(VM_top1.list[1]);
         TRY(to_inc, error_log("variable \"%.*s\" to increment not found", VM_top1.list[1].size, VM_top1.list[1].str));
+        if (to_inc->value.tag == tag_reference)
+        {
+            assert(to_inc->value.list);
+            ++to_inc->value.list->integer;
+            VM_top1 = *to_inc->value.list;
+            return true;
+        }
         TRY(to_inc->value.tag == tag_integer, error_log("try to increment %s", tag_to_string(to_inc->value.tag)));
         to_inc->value.integer += 1;
         VM_top1 = to_inc->value;
@@ -597,6 +604,13 @@ bool primitive_decrement(void)
     {
         Variable *to_inc = get_Variable(VM_top1.list[1]);
         TRY(to_inc, error_log("variable \"%.*s\" to decrement not found", VM_top1.list[1].size, VM_top1.list[1].str));
+        if (to_inc->value.tag == tag_reference)
+        {
+            assert(to_inc->value.list);
+            --to_inc->value.list->integer;
+            VM_top1 = *to_inc->value.list;
+            return true;
+        }
         TRY(to_inc->value.tag == tag_integer, error_log("try to decrement %s", tag_to_string(to_inc->value.tag)));
         to_inc->value.integer -= 1;
         VM_top1 = to_inc->value;
@@ -1194,6 +1208,24 @@ bool primitive_dollar(void)
     return true;
 }
 
+bool primitve_multi(void)
+{ // eval multiple time value
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "multi"));
+    TRY(VM_top1.size == 3, error_log("expected 3 elements (multi COUNT TO_EVAL) got %d", VM_top1.size));
+
+    VM_push(VM_top1.list[1]);
+    TRY(eval());
+    TRY(VM_top1.tag == tag_integer, error_log("expected an integer for multi got %s", tag_to_string(VM_top1.tag)));
+
+    VM_push(VM_top2.list[2]);
+    for (int i = 0; i < VM_top2.integer; i++)
+        TRY(eval(), error_log("failed multi iteration %d/%d", i, VM_top2.integer));
+
+    VM_top3 = VM_top1;
+    VM_pop; VM_pop;
+
+    return true;
+}
 
 /* Types */
 
@@ -1293,9 +1325,9 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("copy"),        .fun = primitive_copy               },
     { .name = _cstr_to_List("?"),           .fun = primitive_exclamation_mark   },
     { .name = _cstr_to_List("if"),          .fun = primitive_if                 },
-    { .name = _cstr_to_List("print"),       .fun = primitive_print              },
     { .name = _cstr_to_List("while"),       .fun = primitive_while              },
     { .name = _cstr_to_List("return"),      .fun = primitive_return             },
+    { .name = _cstr_to_List("print"),       .fun = primitive_print              },
     { .name = _cstr_to_List("+"),           .fun = primitive_plus               },
     { .name = _cstr_to_List("++"),          .fun = primitive_increment          },
     { .name = _cstr_to_List("--"),          .fun = primitive_decrement          },
@@ -1323,7 +1355,7 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("dereference"), .fun = primitive_dereference        },
     { .name = _cstr_to_List("list"),        .fun = primitive_list               },
     { .name = _cstr_to_List("array"),       .fun = primitive_array              },
-
+    { .name = _cstr_to_List("multi"),       .fun = primitve_multi               },
 };
 
 /* uint32_t primitive_hash(const List str, uint32_t seed)

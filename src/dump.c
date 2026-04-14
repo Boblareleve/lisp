@@ -6,6 +6,8 @@ bool _dump_indent(Strb *out, const List li, int indent)
     TRY(out, error_log("no output Strb"));
 
     Strb_cat_nchar(out, indent, ' ');
+    Strb_cat_nchar(out, li.quote_count, '\'');
+    
     switch (li.tag)
     {
     case tag_list: {
@@ -80,6 +82,8 @@ bool dump(Strb *out, const List li)
 {
     TRY(out, error_log("no output Strb"));
 
+    Strb_cat_nchar(out, li.quote_count, '\'');
+
     switch (li.tag)
     {
     case tag_list: {    
@@ -108,6 +112,8 @@ bool dump_indent(Strb *out, const List li)
 {
     return _dump_indent(out, li, 0);
 }
+
+
 bool List_print(const List li)
 {
     static Strb to_print = {0};
