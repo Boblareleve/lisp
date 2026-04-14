@@ -519,6 +519,7 @@ bool primitive_for(void)
 
 bool primitive_return(void)
 {
+    assert(!g_ctx->in_return && !g_ctx->in_break);
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "return"));
     TRY(VM_top1.size == 1 || VM_top1.size == 2, error_log("expected 2 or 3 elements for 'return' got %d", VM_top1.size));
     if (VM_top1.size == 2)
@@ -530,6 +531,23 @@ bool primitive_return(void)
         VM_top1 = NIL_LIST;
     
     g_ctx->in_return = true;
+    return false; // not a real error
+}
+
+bool primitive_break(void)
+{
+    assert(!g_ctx->in_return && !g_ctx->in_break);
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "break"));
+    TRY(VM_top1.size == 1 || VM_top1.size == 2, error_log("expected 2 or 3 elements for 'break' got %d", VM_top1.size));
+    if (VM_top1.size == 2)
+    {
+        VM_top1 = VM_top1.list[1];
+        TRY(eval());
+    }
+    else
+        VM_top1 = NIL_LIST;
+    
+    g_ctx->in_break = true;
     return false; // not a real error
 }
 
@@ -1327,6 +1345,7 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("if"),          .fun = primitive_if                 },
     { .name = _cstr_to_List("while"),       .fun = primitive_while              },
     { .name = _cstr_to_List("return"),      .fun = primitive_return             },
+    { .name = _cstr_to_List("break"),       .fun = primitive_break              },
     { .name = _cstr_to_List("print"),       .fun = primitive_print              },
     { .name = _cstr_to_List("+"),           .fun = primitive_plus               },
     { .name = _cstr_to_List("++"),          .fun = primitive_increment          },

@@ -76,13 +76,13 @@ bool global_Variable(Variable var)
     return true;
 }
 
-bool push_stack_frame(void)
+static inline bool push_stack_frame(bool is_macro)
 {
     assert(g_ctx);
 
     da_push(&g_ctx->stack, (Variable){
         .name = _cstr_to_List_symbole(""),
-        .value = { .tag = ttag_frame, .integer = g_ctx->frame_start },
+        .value = { .tag = is_macro ? ttag_macro : ttag_frame, .integer = g_ctx->frame_start },
         .type = ANY_TYPE
     });
     g_ctx->frame_start = g_ctx->stack.size;
@@ -90,22 +90,37 @@ bool push_stack_frame(void)
 }
 
 // push a marker to pop to (do linear search as it can be mouved)
-bool pop_stack_frame(void)
+static inline bool pop_stack_frame(bool is_macro)
 {
     assert(g_ctx);
+    do {
+        TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+        g_ctx->stack.size = g_ctx->frame_start-1;
+        g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
 
-    TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
-    g_ctx->stack.size = g_ctx->frame_start-1;
-    assert(g_ctx->stack.arr[g_ctx->stack.size].value.tag == ttag_frame);
-    g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+    } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
+            == (!is_macro ? ttag_macro : ttag_frame));
 
-    // while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
-    //     g_ctx->stack.size--;
-    // if (g_ctx->stack.size > 0)
-    //     g_ctx->stack.size--;
     return true;
 }
 
+static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
+{
+    if (!g_ctx->in_return && !g_ctx->in_break)
+        return false; // true error
+    
+    // else return|break have been call
+    
+    reset_error(); // TODO: avoid needing to erase false error
+    g_ctx->in_return = false; // not in return anymore
+    g_ctx->in_break = false;
+    TRY(pop_stack_frame(is_macro));
+    
+    // pop vm_stack frame
+    g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
+    g_ctx->vm_stack.size = vm_stack_sp-1;
+    return true; // terminate
+}
 
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
@@ -115,6 +130,14 @@ bool eval_function(void)
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
     TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
     TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
+    
+    // those two have similar beaviour
+    // macro: '('(a b) (+ (multi a) (multi b)))
+    //          ^
+    // function: '((a b) (+ a b))
+    //             ^
+    
+    bool is_macro = VM_top1.list[0].quote_count != 0;
     
     
     List return_type = ANY_TYPE;
@@ -127,8 +150,7 @@ bool eval_function(void)
 
         static da_Variable args = {0};
         int args_point = args.size;
-        // args.size = 0;
-        
+
         bool last_argument_have_hint = true;
         for (int i = 0; i < EF_VM_arg_def_count; i++)
         {
@@ -138,7 +160,7 @@ bool eval_function(void)
                 if (last_argument_have_hint)
                 { // function type
                     TRY(i+1 == EF_VM_arg_def_count, error_log("two type not at the end")); // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
-                    TRY(args.size - args_point == EF_VM_arg_call_count);
+                    TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many or too little call argument"));
                     return_type = s->value;
                     continue;
                 }
@@ -150,7 +172,7 @@ bool eval_function(void)
             
             TRY(args.size - args_point < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
             VM_top1 = EF_VM_arg_call(args.size - args_point);
-            if (EF_VM_arg_def(i).quote_count == 0)
+            if (!is_macro && EF_VM_arg_def(i).quote_count == 0)
                 TRY(eval());
             
             da_push(&args, (Variable){
@@ -165,7 +187,7 @@ bool eval_function(void)
         }
         TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", EF_VM_arg_call_count, args.size - args_point));
         
-        push_stack_frame();
+        push_stack_frame(is_macro);
         for (int i = args_point; i < args.size; i++)
             da_push(&g_ctx->stack, args.arr[i]);
         args.size = args_point;
@@ -179,31 +201,17 @@ bool eval_function(void)
     for (int i = 1; i+1 < VM_top1.size; i++)
     {
         VM_push(VM_top1.list[i]);
-        if (!eval())
-        {
-            if (g_ctx->in_return) // return have been call
-            {
-                reset_error(); // need to find solution for that
-                g_ctx->in_return = false; // not in return anymore
-                TRY(pop_stack_frame());
-                
-                // pop vm_stack frame
-                g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
-                g_ctx->vm_stack.size = vm_stack_sp-1;
-                return true; // terminate
-            }
-            return false; // true error
-        }
+        if (!eval()) return handel_return_break(vm_stack_sp, is_macro);
         VM_pop;
     }
     
     // return the last one
     VM_top2 = VM_top1.list[VM_top1.size-1]; // ¿return?
     VM_pop;
-    TRY(eval(), pop_stack_frame());
-    TRY(is_of_type(VM_top1, return_type), pop_stack_frame(); error_log("function return unexpected type"));
+    if (!eval()) return handel_return_break(vm_stack_sp, is_macro);
+    TRY(is_of_type(VM_top1, return_type), pop_stack_frame(is_macro); error_log("function return unexpected type"));
     
-    TRY(pop_stack_frame());
+    TRY(pop_stack_frame(is_macro));
     return true;
 }
 

@@ -76,5 +76,3 @@ EXE ?= lisp_s
 FILES ?= ../$(shell find ./tests/unit -type f)
 tests: $(EXE)
 	@./$(EXE) ./tests/$(FILES)
-
-

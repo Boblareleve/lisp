@@ -29,6 +29,7 @@ typedef enum List_tag : uint8_t
     tag_foreign_function, // Foreign_fun
     ttag_any_type, // can only be use in type_tag fild of List 
     ttag_frame, // to indicate the in a variable the value associated is a the index to the start of the previous frame
+    ttag_macro, // to indicate start of a macro stack frame  
 } List_tag;
 static inline bool is_list_self_evaluating(List_tag tag)
 {
@@ -114,11 +115,11 @@ typedef struct Lisp_context
 
     // stack (local)
     da_Variable stack;
-    int frame_start;
-    // bool stack_allocation_allowed;
+    int frame_start; // macro/function
     bool in_return; // indicate that the error is only a return mechanism
                     // see with vm_stack
-
+    bool in_break;
+    
     List root;
 
     set_void_ptr gc;
