@@ -1,0 +1,5 @@
+EQUAL
+()
+(while ()
+    (+) ; <- error
+)

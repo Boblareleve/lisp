@@ -163,11 +163,13 @@ bool eval_function(void)
             
             last_argument_have_hint = false;
         }
+        TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", EF_VM_arg_call_count, args.size - args_point));
         
         push_stack_frame();
         for (int i = args_point; i < args.size; i++)
             da_push(&g_ctx->stack, args.arr[i]);
         args.size = args_point;
+        
     } VM_pop;
 
 
@@ -317,7 +319,7 @@ void List_free(List li)
         for (size_t i = 0; i < li.size; i++)
             List_free(li.list[i]);
     }
-    
+
     assert(!IS_NIL(li) || li.list == NULL);
     free(List_get_ptr(li));
 }

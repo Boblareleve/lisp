@@ -1,4 +1,4 @@
-#include "eval_list.h"
+#include "eval.h"
 
 #define EVAL_LIST_ASSERT(expr) assert(expr);
 
@@ -465,7 +465,7 @@ bool primitive_while(void)
         }
         VM_pop;
 
-
+        
         for (int i = 2; i < VM_top2.size; i++)
         {
             VM_top1 = VM_top2.list[i];
@@ -885,7 +885,7 @@ bool primitive_and(void)
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "&&"));
     TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for '&&' got %d", VM_top1.size));
     
-    for (int i = 1; i < VM_top2.size; i++)
+    for (int i = 1; i < VM_top1.size; i++)
     {
         VM_push(VM_top1.list[i]);
         TRY(eval());

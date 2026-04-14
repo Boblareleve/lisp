@@ -1,0 +1,3 @@
+ERROR
+
+(global 'a (a))

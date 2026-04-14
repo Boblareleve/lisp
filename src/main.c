@@ -235,12 +235,17 @@ int main(int argc, char **argv)
             continue ;
         }
         
-        fprintf(fd, "TEST %-*s\t", 48, argv[i]);
+        fprintf(fd, "TEST %-*s\t", 64, argv[i]);
         fflush(fd);
-        if (!test(raw.view))
-            fprintf(fd, "\tFAILURE\n");
+        
+        clock_t time_start = clock();
+        bool res = test(raw.view);
+        clock_t time_end = clock();
+        if (!res)
+            fprintf(fd, "\tFAILURE");
         else
-            fprintf(fd, "\tSUCCESS\n");
+            fprintf(fd, "SUCCESS");
+        fprintf(fd, "  %lfms\n", 1000 * (double)(time_end - time_start) / CLOCKS_PER_SEC);
         
         Strb_free(raw);
     }
