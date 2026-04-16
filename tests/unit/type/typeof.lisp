@@ -1,6 +1,6 @@
 EQUAL
 
-(eval
+(list '(
     string
     int
     float
@@ -10,11 +10,12 @@ EQUAL
     any
     int
     int
-)
+))
+
 (local 'x any 0)
 (local 'y 1)
 (local 'yy int 1)
-(eval
+(list '(
     (typeof "bla")
     (typeof 3245)
     (typeof 49.2)
@@ -24,4 +25,4 @@ EQUAL
     (typeof x)
     (typeof y)
     (typeof yy)
-)
+))

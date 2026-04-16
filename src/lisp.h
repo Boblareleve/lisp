@@ -118,6 +118,7 @@ typedef struct Lisp_context
     int frame_start; // macro/function
     bool in_return; // indicate that the error is only a return mechanism
                     // see with vm_stack
+    int macro_start;
     bool in_break;
     
     List root;
@@ -127,6 +128,8 @@ typedef struct Lisp_context
     da_List vm_stack;
     Strb error;
 } Lisp_context;
+
+
 
 
 // VM

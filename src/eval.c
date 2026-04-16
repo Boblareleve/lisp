@@ -961,46 +961,50 @@ bool primitive_or(void)
 /* List */
 
 bool primitive_list(void)
-{ // create a copy but with evaluated elements
+{ // create a copy of element 1 but with evaluated elements
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "list"));
 
-    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'list' got %d", VM_top1.size));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'list' got %d", VM_top1.size));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
 
+    TRY(VM_top1.tag == tag_list, error_log("expected a list to build"));
     VM_push((List){
         .tag = tag_list,
-        .size = VM_top1.size - 1,
-        .list = List_alloc(sizeof(List) * (VM_top1.size-1))
+        .size = VM_top1.size,
+        .list = List_alloc(sizeof(List) * (VM_top1.size))
     });
     VM_push(NIL_LIST);
-    for (int i = 0; i+1 < VM_top3.size; i++)
+    for (int i = 0; i < VM_top3.size; i++)
     {
-        VM_top1 = VM_top3.list[i+1];
+        VM_top1 = VM_top3.list[i];
         TRY(eval());
         VM_top2.list[i] = VM_top1;
     }
     VM_top3 = VM_top2;
-    VM_pop;
-    VM_pop;
+
+    VM_pop; VM_pop;
     return true;
 }
 
 bool primitive_eval(void)
-{ // return an array of every element from index 1 of the list evaluated.
+{ // eval every element of element 1 then return the last element of elements 1 eval.
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "eval"));
-    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'eval' got %d", VM_top1.size));
-    VM_push((List){
-        .tag = tag_list,
-        .size = VM_top1.size-1,
-        .list = List_alloc(sizeof(List) * (VM_top1.size - 1))
-    });
-    for (int i = 1; i < VM_top2.size; i++)
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'eval' got %d", VM_top1.size));
+
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_list, error_log("TODO"));
+
+    VM_push(NIL_LIST);
+    for (int i = 0; i < VM_top2.size; i++)
     {
-        VM_push(VM_top2.list[i]);
+        VM_top1 = VM_top2.list[i];
         TRY(eval());
-        VM_top2.list[i-1] = VM_top1;
-        VM_pop;
     }
-    VM_top2 = VM_top1; 
+    VM_top2 = VM_top1;
+
     VM_pop;
     return true;
 }
@@ -1331,9 +1335,6 @@ SET_IMPLEMENT_HASH_SET(Primitive, SET_PRIM_IS_NULL, SET_PRIM_SET_NULL, 2, 0.7, 6
 
 
 static const Primitive keys[] = {
-    // { .name = _cstr_to_List("defun"),       .fun = primitive_defun              },
-    // { .name = _cstr_to_List("first"),       .fun = primitive_first              },
-    // { .name = _cstr_to_List("next"),        .fun = primitive_next               },
     { .name = _cstr_to_List("local"),       .fun = primitive_local              },
     { .name = _cstr_to_List("upgrade"),     .fun = primitive_upgrade            },
     { .name = _cstr_to_List("global"),      .fun = primitive_global             },

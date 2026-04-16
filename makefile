@@ -4,11 +4,18 @@ MAKEFLAGS += -j16
 
 
 
-CFLAGS=-I$(MY_LIB) -Wextra -Werror=incompatible-pointer-types -Wall -Wno-type-limits -Wno-missing-braces -Wno-address
-LFLAGS=-lm -lffi
+CFLAGS = -I$(MY_LIB)						\
+		 -MMD -MP 							\
+		 -Wextra -Wall 						\
+		 -Werror=incompatible-pointer-types	\
+		 -Wno-missing-braces 				\
+		 -Wno-type-limits 					\
+		 -Wno-address
+LFLAGS = -lm -lffi
 
 OBJ_DIR = obj
 SRC_DIR = src
+DEP_DIR = obj
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 
@@ -16,6 +23,14 @@ OBJS 		 = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 OBJS_SAN     = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.san.o, $(SRCS))
 OBJS_DEBUG 	 = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.debug.o, $(SRCS))
 OBJS_RELEASE = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.release.o, $(SRCS))
+
+DEPS		 = $(patsubst $(SRC_DIR)/%.c, $(DEP_DIR)/%.d, $(SRCS))
+DEPS_SAN     = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.san.d, $(SRCS))
+DEPS_DEBUG 	 = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.debug.d, $(SRCS))
+DEPS_RELEASE = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.release.d, $(SRCS))
+
+
+-include $(DEPS) $(DEPS_SAN) $(DEPS_DEBUG) $(DEPS_RELEASE)
 
 all: lisp san debug release
 
