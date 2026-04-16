@@ -1,9 +1,9 @@
 t
 
-(local b 0)
+(local 'b 0)
 
 ('((n)
-    (local a 0)
+    (local 'a 0)
     0
 ) 0)
 

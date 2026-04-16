@@ -3,7 +3,7 @@
 #include "lisp.h"
 
 
-// Strb error = {0};
+Strb static_error = {0};
 Lisp_context *g_ctx = NULL;
 
 #define VAR_IS_NULL(var)  ((var).name.str == NULL)
@@ -25,8 +25,8 @@ SET_IMPLEMENT_HASH_SET(Variable, VAR_IS_NULL, VAR_SET_NULL, 4, 0.8, 64);
 
 
 Variable *get_local_Variable(List name)
-{   
-    for (int i = g_ctx->stack.size - 1; i >= 0; i--)
+{
+    for (int i = g_ctx->stack.size - 1; i >= g_ctx->frame_start; i--)
     {
         TRY(g_ctx->stack.arr[i].name.tag == tag_symbole);
         if (List_str_equal(g_ctx->stack.arr[i].name, name))
@@ -52,7 +52,7 @@ Variable *get_Variable(List name)
 // return index in the call stack
 size_t local_Variable(Variable var)
 {
-    for (int i = g_ctx->stack.size-1; i >= 0; i--)
+    for (int i = g_ctx->stack.size-1; i >= g_ctx->frame_start; i--)
     {
         if (List_str_equal(g_ctx->stack.arr[i].name, var.name))
         {
@@ -76,53 +76,170 @@ bool global_Variable(Variable var)
     return true;
 }
 
-bool push_stack_frame(void)
+static inline bool push_stack_frame(bool is_macro)
 {
+    assert(g_ctx);
+
     da_push(&g_ctx->stack, (Variable){
-        .name = _cstr_to_List(""),
-        .value = { .tag = ttag_frame },
+        .name = _cstr_to_List_symbole(""),
+        .value = { 
+            .tag =     is_macro ? ttag_macro         : ttag_frame, 
+            .integer = is_macro ? g_ctx->macro_start : g_ctx->frame_start
+        },
         .type = ANY_TYPE
     });
+
+    if (!is_macro)
+        g_ctx->frame_start = g_ctx->stack.size;
+    g_ctx->macro_start = g_ctx->stack.size;
+
     return true;
 }
 
 // push a marker to pop to (do linear search as it can be mouved)
-bool pop_stack_frame(void)
+static inline bool pop_stack_frame(bool is_macro)
 {
-    while (g_ctx->stack.size > 0 && da_top(&g_ctx->stack).value.tag != ttag_frame)
-        g_ctx->stack.size--;
+    TODO("");
+    assert(g_ctx);
+    do {
+        TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+        g_ctx->stack.size = g_ctx->frame_start-1;
+        g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+
+    } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
+            == (!is_macro ? ttag_macro : ttag_frame));
+
     return true;
 }
 
+static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
+{
+    assert(!g_ctx->in_return || !g_ctx->in_break);
+    // if (!g_ctx->in_return && !g_ctx->in_break)
+        // return false; // true error
+    
+    if (g_ctx->in_return)
+    {
+        if (is_macro) return false; // return used in a macro keep heading up
+
+        reset_error(); // TODO: avoid needing to erase false error
+        g_ctx->in_return = false;
+
+        TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+        g_ctx->stack.size = g_ctx->frame_start-1;
+        g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+        g_ctx->macro_start = g_ctx->frame_start;
+        
+        // pop vm_stack frame
+        g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
+        g_ctx->vm_stack.size = vm_stack_sp-1;
+    
+        return true;
+    }
+    if (g_ctx->in_break)
+    {
+        TRY(is_macro, error_log("break used outside a macro"));
+        reset_error(); // TODO: avoid needing to erase false error
+        g_ctx->in_break = false;
+
+        TRY(g_ctx->macro_start > 0, error_log("try to break from root stack frame"));
+        g_ctx->stack.size = g_ctx->macro_start-1;
+        g_ctx->macro_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+
+
+        // pop vm_stack frame
+        g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
+        g_ctx->vm_stack.size = vm_stack_sp-1;
+        
+        return true;
+    }
+
+    return false; // true error
+    
+    // else return|break have been call
+
+    // reset_error(); // TODO: avoid needing to erase false error
+    // g_ctx->in_return = false; // not in return anymore
+    // g_ctx->in_break = false;
+    // TRY(pop_stack_frame(is_macro));
+    
+    // // pop vm_stack frame
+    // g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
+    // g_ctx->vm_stack.size = vm_stack_sp-1;
+    // return true; // terminate
+}
 
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
 {
     TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
+    TRY(VM_top1.tag == tag_list, error_log("function definition not a list"));
     TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
     TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
     TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
     
+    // those two have similar beaviour
+    // macro: '('(a b) (+ (multi a) (multi b)))
+    //          ^
+    // function: '((a b) (+ a b))
+    //             ^
+    
+    bool is_macro = VM_top1.list[0].quote_count != 0;
+    
+    
     List return_type = ANY_TYPE;
     
-    {
-        push_stack_frame();
+    VM_push(NIL_LIST); { // parse and check arguments
+        #define EF_VM_arg_call(i) (VM_top3.list[i+1])
+        #define EF_VM_arg_call_count (VM_top3.size - 1)
+        #define EF_VM_arg_def(i) (VM_top2.list[0].list[i])
+        #define EF_VM_arg_def_count (VM_top2.list[0].size)
 
-        for (int i = 0; i < VM_top1.list[0].size; i++)
+        static da_Variable args = {0};
+        int args_point = args.size;
+
+        bool last_argument_have_hint = true;
+        for (int i = 0; i < EF_VM_arg_def_count; i++)
         {
-            VM_push(VM_top2.list[i+1]);
+            Variable *s = get_global_Variable(EF_VM_arg_def(i));
+            if (s && s->type.tag == tag_type && s->type.type_tag == tag_type)
             {
-                TRY(eval(), pop_stack_frame());
-                
-                da_push(&g_ctx->stack, (Variable){
-                    .name = VM_top2.list[0].list[i],
-                    .type = ANY_TYPE, // TODO types
-                    .value = VM_top1
-                });
+                if (last_argument_have_hint)
+                { // function type
+                    TRY(i+1 == EF_VM_arg_def_count, error_log("two type not at the end")); // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
+                    TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many or too little call argument"));
+                    return_type = s->value;
+                    continue;
+                }
+                da_top(&args).type = s->value;
+                TRY(is_of_type(da_top(&args).value, da_top(&args).type), error_log("argument %d did not match it's type hint", args.size - args_point - 1));
+                last_argument_have_hint = true;
+                continue;
             }
-            VM_pop;
+            
+            TRY(args.size - args_point < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
+            VM_top1 = EF_VM_arg_call(args.size - args_point);
+            if (/* !is_macro &&  */EF_VM_arg_def(i).quote_count == 0)
+                TRY(eval());
+            
+            da_push(&args, (Variable){
+                .name = EF_VM_arg_def(i),
+                .type = ANY_TYPE,
+                .value = VM_top1
+            });
+            if (EF_VM_arg_def(i).quote_count != 0)
+                da_top(&args).name.quote_count--;
+            
+            last_argument_have_hint = false;
         }
-    }
+        TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", EF_VM_arg_call_count, args.size - args_point));
+        
+        push_stack_frame(is_macro);
+        for (int i = args_point; i < args.size; i++)
+            da_push(&g_ctx->stack, args.arr[i]);
+        args.size = args_point;
+        
+    } VM_pop;
 
 
     const int vm_stack_sp = g_ctx->vm_stack.size;
@@ -131,31 +248,17 @@ bool eval_function(void)
     for (int i = 1; i+1 < VM_top1.size; i++)
     {
         VM_push(VM_top1.list[i]);
-        if (!eval())
-        {
-            if (g_ctx->in_return) // return have been call
-            {
-                reset_error(); // need to find solution for that
-                g_ctx->in_return = false; // not in return anymore
-                pop_stack_frame();
-
-                // pop vm_stack frame
-                g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
-                g_ctx->vm_stack.size = vm_stack_sp-1;
-                return true; // terminate
-            }
-            return false; // true error
-        }
+        if (!eval()) return handel_return_break(vm_stack_sp, is_macro);
         VM_pop;
     }
     
     // return the last one
     VM_top2 = VM_top1.list[VM_top1.size-1]; // ¿return?
     VM_pop;
-    TRY(eval(), pop_stack_frame());
-    TRY(is_of_type(VM_top1, return_type), pop_stack_frame(); error_log("function return unexpected type"));
+    if (!eval()) return handel_return_break(vm_stack_sp, is_macro);
+    TRY(is_of_type(VM_top1, return_type), pop_stack_frame(is_macro); error_log("function return unexpected type"));
     
-    pop_stack_frame();
+    TRY(pop_stack_frame(is_macro));
     return true;
 }
 
@@ -168,7 +271,7 @@ bool eval(void)
         return true;
     }
     if (VM_top1.tag == tag_list)
-    {    
+    {
         // nil|false
         if (IS_NIL(VM_top1))
             return true;
@@ -189,7 +292,6 @@ bool eval(void)
 
         Variable *var = get_Variable(VM_top1.list[0]);
         TRY(var, error_log("no primitive '%.*s' found to evaluate a list", VM_top1.list->size, VM_top1.list->str));
-        // TODO("eval_fun");
         VM_push(var->value);
         TRY(eval_function());
         return true;
@@ -264,27 +366,24 @@ List List_copy(const List li)
     return li;
 }
 
-
 // !!shortcut GC!!
-void List_free(List *li)
-{
-    if (!li) return ;
-    
-    if (li->tag == tag_list)
+void List_free(List li)
+{    
+    if (li.tag == tag_list)
     {
-        if (IS_NIL(*li)) return ;
-
-        for (size_t i = 0; i < li->size; i++)
-            List_free(&li->list[i]);
+        for (size_t i = 0; i < li.size; i++)
+            List_free(li.list[i]);
     }
+
+    assert(!IS_NIL(li) || li.list == NULL);
     free(List_get_ptr(li));
 }
 
 
 set_void_ptr add_to_gc_context(set_void_ptr gc, List root)
 {
-    if (List_get_ptr(&root))
-        set_void_ptr_insert(&gc, List_get_ptr(&root));
+    if (List_get_ptr(root))
+        set_void_ptr_insert(&gc, List_get_ptr(root));
 
     if (root.tag == tag_list)
         for (int i = 0; i < root.size; i++)
@@ -299,8 +398,7 @@ Lisp_context *Lisp_context_init(List root)
     Lisp_context *res = calloc(1, sizeof(*res));
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
-    // res->stack_allocation_allowed = true;
-
+    
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
     { // buildin types
@@ -324,6 +422,8 @@ void set_Lisp_context(Lisp_context *ctx)
 
 void Lisp_context_free(void)
 {
+    assert(g_ctx);
+    // if (!g_ctx) return;
     { // free memory not tracked by gc
         da_free(&g_ctx->stack);
         da_free(&g_ctx->vm_stack);

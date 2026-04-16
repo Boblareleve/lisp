@@ -1,0 +1,6 @@
+EQUAL
+()
+
+(local 'foo '(() ()))
+
+(foo)

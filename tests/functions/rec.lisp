@@ -1,5 +1,5 @@
 ()
-(defun rec ((n)
+(global 'rec '((n)
     ;; (print n)
     
     (? (== n 0) 

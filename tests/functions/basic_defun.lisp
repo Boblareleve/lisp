@@ -1,6 +1,6 @@
 t
-(defun foo ((n)
-    (local r (+ n 1))
+(global 'foo '((n)
+    (local 'r (+ n 1))
     ;;  (print n)
     r
 ))

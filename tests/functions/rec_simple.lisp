@@ -1,10 +1,10 @@
 t
-(defun rec_simple (()
+(global 'rec_simple '(()
     (= n (- n 1))
     (? (== n 0) ()
         (rec_simple)
     )
 ))
-(global n 200)
+(global 'n 200)
 (rec_simple)
 (== n 0)

@@ -1,5 +1,5 @@
 t
-(defun foo ((n)
+(global 'foo '((n)
     (if (== n 2) 
         (return n)
     )

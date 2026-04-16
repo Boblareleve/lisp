@@ -1,6 +1,6 @@
 t
 
-(defun array_equal ((a b)
+(global 'array_equal '((a b)
 
     (while (&& a b) ;; while a and b are not empty
         (if (!= (first a) (first b)) (return ()))

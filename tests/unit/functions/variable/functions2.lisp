@@ -1,0 +1,6 @@
+EQUAL
+()
+
+(global 'foo '(() ()))
+
+(foo)

@@ -2,7 +2,21 @@
 
 Ar arena = {0};
 
-#define GOTRY_consume(str) GOTRY(consume(str), error_log("unexpected EOF"))
+
+// only free element of list 
+static inline void body_List_free(List li)
+{
+    if (li.tag != tag_list)
+        return ;
+    
+    for (int i = 0; i < li.size; i++)
+        List_free(li.list[i]);
+}
+
+
+#define EOF_error_msg "unexpected EOF"
+#define GOTRY_consume(str) GOTRY(consume(str), error_log(EOF_error_msg))
+#define TRY_consume(str)     TRY(consume(str), error_log(EOF_error_msg))
 bool consume(Strv *str)
 {
     Strv_inc(str);
@@ -131,19 +145,20 @@ List escaping(Strv str)
 
 bool list(Strv *str, List *li)
 {
+    skip_comment(str);
+
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
-    TRY(str->size > 0, error_log("empty input"));
+    TRY(str->size > 0, error_log(EOF_error_msg));
     
-    skip_comment(str);
     
     if (Strv_first(*str) == '(')
     {
         li->tag = tag_list;
         
-        TRY(consume(str), error_log("EOF"));
+        TRY_consume(str);
         skip_comment(str);
-        TRY(str->size > 0, error_log("EOF"));
+        TRY(str->size > 0, error_log(EOF_error_msg));
         
         if (Strv_first(*str) == ')')
         {
@@ -165,8 +180,8 @@ bool list(Strv *str, List *li)
             }
             
             assert(li->list);
-            TRY(list(str, &li->list[li->size]));
-            li->size++;
+            TRY(list(str, &li->list[li->size++]), body_List_free(*li); *li = NIL_LIST);
+            
             skip_comment(str);
         } while (str->size > 0 && Strv_first(*str) != ')');
         Strv_inc(str);
@@ -181,33 +196,38 @@ bool list(Strv *str, List *li)
         char *it = str->arr;
         char *end = &str->arr[str->size];
 
+        errno = 0;
         *li = (List){
             .tag = tag_integer,
             .integer = strtoll(str->arr, &it, 10)
         };
-        if (*it == '.')
+
+        if (!errno && *it == '.')
             *li = (List){
                 .tag = tag_real,
                 .real = strtod(str->arr, &it)
             };
+        TRY(!errno, error_log("invalid number"));
+        
         
         if (it != str->arr)
         {
             *str = Strv_range(it, end); 
             return true;
         }
+        UNREACHABLE("have digit but empty also ?!¿");
     }
     if (Strv_first(*str) == '"')
     {
-        TRY(consume(str));
+        TRY_consume(str);
         char *begin = str->arr;
         while (Strv_first(*str) != '"')
         {
-            TRY(consume(str));
+            TRY_consume(str);
             if (Strv_first(*str) == '\\')
             {
-                TRY(consume(str));
-                TRY(consume(str));
+                TRY_consume(str);
+                TRY_consume(str);
             }
         }
 
@@ -220,8 +240,9 @@ bool list(Strv *str, List *li)
         // count ref depth
         uint32_t count = 1;
 
-        do TRY(consume(str)); while (Strv_first(*str) == '\'');
+        do TRY_consume(str); while (Strv_first(*str) == '\'');
         
+        TRY(Strv_first(*str) != ')', error_log("unexpected ')' after a quote"));
         TRY(list(str, li));
         li->quote_count = count;
         
@@ -248,6 +269,7 @@ bool list(Strv *str, List *li)
     return true;
 }
 
+
 bool lists(Strv str, List *li)
 {
     Ar_save_point save = Ar_save(&arena);
@@ -267,9 +289,8 @@ bool lists(Strv str, List *li)
             capacity += 4;
         }
         
-        TRY(list(&str, &li->list[li->size]));
-        li->size++;
-
+        TRY(list(&str, &li->list[li->size++]), body_List_free(*li); *li = NIL_LIST);
+        
         skip_comment(&str);
     }
 

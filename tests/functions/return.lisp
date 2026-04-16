@@ -1,5 +1,5 @@
 t
-(defun foo (()
+(global 'foo '(()
     (return 2)
     1
 ))
