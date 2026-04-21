@@ -52,7 +52,7 @@ Variable *get_Variable(List name)
 // return index in the call stack
 size_t local_Variable(Variable var)
 {
-    for (int i = g_ctx->stack.size-1; i >= g_ctx->frame_start; i--)
+    for (int i = g_ctx->stack.size-1; i >= MAX(g_ctx->frame_start, g_ctx->macro_start); i--)
     {
         if (List_str_equal(g_ctx->stack.arr[i].name, var.name))
         {
@@ -91,7 +91,8 @@ static inline bool push_stack_frame(bool is_macro)
 
     if (!is_macro)
         g_ctx->frame_start = g_ctx->stack.size;
-    g_ctx->macro_start = g_ctx->stack.size;
+    else
+        g_ctx->macro_start = g_ctx->stack.size;
 
     return true;
 }
@@ -99,15 +100,27 @@ static inline bool push_stack_frame(bool is_macro)
 // push a marker to pop to (do linear search as it can be mouved)
 static inline bool pop_stack_frame(bool is_macro)
 {
-    TODO("");
     assert(g_ctx);
-    do {
-        TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
-        g_ctx->stack.size = g_ctx->frame_start-1;
-        g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+    if (is_macro)
+    {
+        g_ctx->stack.size = g_ctx->macro_start-1;
+        assert(g_ctx->stack.arr[g_ctx->stack.size].value.tag == ttag_macro);
+        g_ctx->macro_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
 
-    } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
-            == (!is_macro ? ttag_macro : ttag_frame));
+        return true;
+    }
+    g_ctx->stack.size = g_ctx->frame_start-1;
+    assert(g_ctx->stack.arr[g_ctx->stack.size].value.tag == ttag_frame);
+    g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+
+    // TODO("");
+    // do {
+    //     TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+    //     g_ctx->stack.size = g_ctx->frame_start-1;
+    //     g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
+
+    // } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
+    //         == (!is_macro ? ttag_macro : ttag_frame));
 
     return true;
 }
@@ -115,9 +128,7 @@ static inline bool pop_stack_frame(bool is_macro)
 static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
 {
     assert(!g_ctx->in_return || !g_ctx->in_break);
-    // if (!g_ctx->in_return && !g_ctx->in_break)
-        // return false; // true error
-    
+
     if (g_ctx->in_return)
     {
         if (is_macro) return false; // return used in a macro keep heading up
@@ -128,7 +139,7 @@ static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
         TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
         g_ctx->stack.size = g_ctx->frame_start-1;
         g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
-        g_ctx->macro_start = g_ctx->frame_start;
+        // g_ctx->macro_start = g_ctx->frame_start;
         
         // pop vm_stack frame
         g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
@@ -138,14 +149,13 @@ static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
     }
     if (g_ctx->in_break)
     {
-        TRY(is_macro, error_log("break used outside a macro"));
+        TRY(is_macro, g_ctx->in_break = false; error_log("break used outside a macro"));
         reset_error(); // TODO: avoid needing to erase false error
         g_ctx->in_break = false;
 
         TRY(g_ctx->macro_start > 0, error_log("try to break from root stack frame"));
         g_ctx->stack.size = g_ctx->macro_start-1;
         g_ctx->macro_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
-
 
         // pop vm_stack frame
         g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
@@ -155,18 +165,6 @@ static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
     }
 
     return false; // true error
-    
-    // else return|break have been call
-
-    // reset_error(); // TODO: avoid needing to erase false error
-    // g_ctx->in_return = false; // not in return anymore
-    // g_ctx->in_break = false;
-    // TRY(pop_stack_frame(is_macro));
-    
-    // // pop vm_stack frame
-    // g_ctx->vm_stack.arr[vm_stack_sp-2] = VM_top1;
-    // g_ctx->vm_stack.size = vm_stack_sp-1;
-    // return true; // terminate
 }
 
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]

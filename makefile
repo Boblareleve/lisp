@@ -48,7 +48,7 @@ $(OBJ_DIR):
 
 san: lisp_s
 
-lisp_s: CFLAGS += -g3 -fsanitize=address,undefined
+lisp_s: CFLAGS += -g3 -fsanitize=address,undefined -DDEBUG
 lisp_s: $(OBJS_SAN)
 	gcc -o lisp_s $^ $(LFLAGS) $(CFLAGS)
 
@@ -58,7 +58,7 @@ $(OBJ_DIR)/%.san.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 debug: lisp_d
 
-lisp_d: CFLAGS += -ggdb
+lisp_d: CFLAGS += -ggdb -DDEBUG
 lisp_d: $(OBJS_DEBUG)
 	gcc -o lisp_d $^ $(LFLAGS) $(CFLAGS)
 
@@ -68,7 +68,7 @@ $(OBJ_DIR)/%.debug.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 release: lisp_r
 
-lisp_r: CFLAGS += -O3
+lisp_r: CFLAGS += -O1 -DNDEBUG
 lisp_r: $(OBJS_RELEASE)
 	gcc -o lisp_r $^ $(LFLAGS) $(CFLAGS)
 

@@ -39,8 +39,8 @@ void skip_comment(Strv *str)
 }
 
 
-int is_end(int c)     { return c == '(' || c == ')' || isspace(c); }
-int not_is_end(int c) { return !is_end(c); }
+static inline int is_end(int c)     { return c == '(' || c == ')' || isspace(c); }
+static inline int not_is_end(int c) { return !is_end(c); }
 
 
 

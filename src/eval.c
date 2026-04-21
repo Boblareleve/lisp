@@ -1422,6 +1422,7 @@ bool test_get_Primitive(void)
     {
         primitive_t p = get_Primitive(keys[i].name);
         // printf("-> p %p <> .fun %p\n", p, keys[i].fun);
+        (void)p;
         assert(keys[i].fun == p); // map[keys[i].name]);
     }
     return true;

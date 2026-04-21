@@ -1,3 +1,5 @@
+/* 
+
 #include <dlfcn.h>
 // #include <ffi.h>
 #include "lisp.h"
@@ -109,10 +111,11 @@ bool get_fun_dl(List lib, List *out, const List name, const List desc)
         printf("result = %d\n", result); // 30
     }
 
-    return true;/* (List){
-        .tag = tag_foreign_function,
-        .fun = fun_ptr
-    }; */
+    return true;
+    // (List){
+        // .tag = tag_foreign_function,
+        // .fun = fun_ptr
+    // }; 
 }
 
 bool unload_dl(const List dl)
@@ -123,3 +126,4 @@ bool unload_dl(const List dl)
 
     return true;
 }
+ */
