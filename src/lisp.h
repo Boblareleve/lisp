@@ -57,10 +57,11 @@ typedef struct
 #define NIL_LIST (List){0}
 #define TRUE_LIST (List){ .tag = tag_true }
 #define IS_NIL(li) ((li).tag == tag_list && (li).size == 0)
-#define ANY_TYPE ((List){ .tag = tag_type, .type_tag = ttag_any_type })
-#define TYPE_TYPE ((List){ .tag = tag_type, .type_tag = tag_type })
 
 #define TYPE_UNDEFINED_LIST_SIZE UINT16_MAX
+#define TYPE_TYPE ((List){ .tag = tag_type, .type_tag = tag_type })
+#define ANY_TYPE ((List){ .tag = tag_type, .type_tag = ttag_any_type })
+#define LIST_TYPE (List){ .tag = tag_type, .type_tag = tag_list, .size = TYPE_UNDEFINED_LIST_SIZE }
 
 
 typedef struct List List;
@@ -195,6 +196,7 @@ static inline void *List_get_ptr(const List li)
 #define _cstr_to_List_symbole(cstr) (List){ .tag = tag_symbole, .size = STRING_LEN(cstr), .str = cstr }
 #define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))
 #define List_equal_lit(li, lit) Strv_equal_lit(List_to_Strv(li), lit)
+#define List_start_with_lit(li, lit) Strv_start_with_lit(List_to_Strv(li), lit)
 
 extern Lisp_context *g_ctx;
 

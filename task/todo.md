@@ -11,9 +11,9 @@
  + ? local -> all accessible but ordonate and not unique 
  + reference:
  + hash table object
- + variatic function arguments the special variable '...' 
+ + variadic function arguments the special variable '...' 
    get encapsulated into a ... roulement de tambour ... a list ; exemple  '((...) (len ...))
-   can have a name exemple: args... but need to end with '...' and is use whiout them args
+   can have a name exemple: '...args' but need to start with '...' and is use without them args
    '... 
  + macro: function but they have a special stack frame and don't eval their arguments
  

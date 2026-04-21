@@ -199,7 +199,9 @@ bool eval_function(void)
         bool last_argument_have_hint = true;
         for (int i = 0; i < EF_VM_arg_def_count; i++)
         {
+            // on type
             Variable *s = get_global_Variable(EF_VM_arg_def(i));
+            assert(!s || s->type.tag == tag_type);
             if (s && s->type.tag == tag_type && s->type.type_tag == tag_type)
             {
                 if (last_argument_have_hint)
@@ -214,10 +216,41 @@ bool eval_function(void)
                 last_argument_have_hint = true;
                 continue;
             }
+
+            // variadic
+            if (EF_VM_arg_def(i).tag == tag_symbole && List_start_with_lit(EF_VM_arg_def(i), "..."))
+            {
+                TRY(i + 1 == EF_VM_arg_def_count, error_log("variadic argument not last in function definition"));
+
+                uint16_t count = (EF_VM_arg_call_count - (args.size - args_point));
+
+                da_push(&args, (Variable){
+                    .name = EF_VM_arg_def(i),
+                    .type = LIST_TYPE,
+                    .value = {
+                        .tag = tag_list,
+                        .size = count,
+                        .list = List_alloc(sizeof(List) * count)
+                    }
+                });
+                if (EF_VM_arg_def(i).quote_count != 0)
+                    da_top(&args).name.quote_count--;
+                
+                for (int j = 0; j < count; j++)
+                {
+                    VM_top1 = EF_VM_arg_call(args.size - args_point + j - 1);
+                    if (EF_VM_arg_def(i).quote_count == 0)
+                        TRY(eval());
+                    da_top(&args).value.list[j] = VM_top1;
+                }
+                
+                goto push_frame; // break but skip argument count check
+            }
+
             
             TRY(args.size - args_point < EF_VM_arg_call_count, error_log("not enough argument provided for function call"));
             VM_top1 = EF_VM_arg_call(args.size - args_point);
-            if (/* !is_macro &&  */EF_VM_arg_def(i).quote_count == 0)
+            if (EF_VM_arg_def(i).quote_count == 0)
                 TRY(eval());
             
             da_push(&args, (Variable){
@@ -232,6 +265,7 @@ bool eval_function(void)
         }
         TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", EF_VM_arg_call_count, args.size - args_point));
         
+    push_frame:
         push_stack_frame(is_macro);
         for (int i = args_point; i < args.size; i++)
             da_push(&g_ctx->stack, args.arr[i]);
@@ -390,6 +424,7 @@ set_void_ptr add_to_gc_context(set_void_ptr gc, List root)
     return gc;
 }
 
+
 Lisp_context *Lisp_context_init(List root)
 {
     assert(root.tag == tag_list);
@@ -400,7 +435,7 @@ Lisp_context *Lisp_context_init(List root)
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
     { // buildin types
-        add_simple_type("list",    (List){ .tag = tag_type, .type_tag = tag_list, .size = TYPE_UNDEFINED_LIST_SIZE, });
+        add_simple_type("list",    LIST_TYPE);
         add_simple_type("symbole", (List){ .tag = tag_type, .type_tag = tag_symbole   });
         add_simple_type("int",     (List){ .tag = tag_type, .type_tag = tag_integer   });
         add_simple_type("float",   (List){ .tag = tag_type, .type_tag = tag_real      });
