@@ -24,6 +24,7 @@ typedef enum List_tag : uint8_t
     tag_real,      // 3.3
     tag_type,      // int...
     tag_reference,
+    tag_object,
     tag_void_ptr,  // C struct handel
     tag_dynamic_lib,
     tag_foreign_function, // Foreign_fun
@@ -65,7 +66,16 @@ typedef struct
 
 
 typedef struct List List;
+DA_TYPEDEF_ARRAY(List);
 
+typedef struct Variable Variable;
+DA_TYPEDEF_ARRAY(Variable);
+DA_TYPEDEF_ARRAY(da_Variable);
+SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
+
+
+
+// 
 
 struct List
 {
@@ -78,29 +88,24 @@ struct List
     uint16_t size;   // count of bytes in string/symbole or List in a list
     
     union {
-        List *list;
-        char *str;
         double real;
         int64_t integer;
+        List *list;
+        set_Variable *object;
+        char *str;
         void *ptr;
         Foreign_fun *ffun;
     };
 };
 static_assert(sizeof(List) == 16);
-DA_TYPEDEF_ARRAY(List);
 
 
-
-
-typedef struct Variable
+struct Variable
 {
     List name;
     List type;
     List value;
-} Variable;
-DA_TYPEDEF_ARRAY(Variable);
-DA_TYPEDEF_ARRAY(da_Variable);
-SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
+};
 
 
 typedef void *void_ptr;
@@ -233,7 +238,7 @@ bool get_fun_dl(List lib, List *out, const List name, const List desc);
 bool have_function_arguments_shape(const List li);
 bool is_of_type(const List li, const List type);
 bool type_equal(const List a, const List b);
-void add_simple_type(const char *name, List type);
+void add_primitive_type(const char *name, List type);
 bool type_compatible(const List a, const List b);
 
 

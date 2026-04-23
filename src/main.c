@@ -232,8 +232,20 @@ int main(int argc, char **argv)
     init_primitive_map();
     test_get_Primitive();
 
+    long samples = 1;
+    int first_test = 1;
+    if (argc >= 2 && (0 == strcmp(argv[1], "-s") || 0 == strcmp(argv[1], "--samples")))
+    {
+        if (argc == 2) return (printf("expected number after %s got nothing", argv[1]), 1);
+
+        errno = 0;
+        samples = strtol(argv[2], NULL, 10);
+        if (errno)  return (printf("%s", strerror(errno)), 1);
+        first_test = 3;
+    }
+
     fd = stdout;
-    for (int i = 1; i < argc; i++)
+    for (int i = first_test; i < argc; i++)
     {
         Strb raw = {0};
         if (Strb_cat_file(&raw, argv[i]))
@@ -246,12 +258,11 @@ int main(int argc, char **argv)
         fprintf(fd, "TEST %-*s\t", 64, argv[i]);
         fflush(fd);
         
-        int samples_count = 1;
         clock_t time;
         bool res = true;
         TIME(time)
         {
-            for (int i = 0; res && i < samples_count; i++)
+            for (int i = 0; res && i < samples; i++)
                 res = test(raw.view);
         }
         if (!res)
@@ -259,7 +270,7 @@ int main(int argc, char **argv)
         else
             fprintf(fd, "SUCCESS");
 
-        time /= samples_count;
+        time /= samples;
         if (time >= CLOCKS_PER_SEC/1000)
             fprintf(fd, "  %.3lfms\n", (double)time * (1000.0 / CLOCKS_PER_SEC));
         else

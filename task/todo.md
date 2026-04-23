@@ -14,7 +14,7 @@
  + variadic function arguments the special variable '...' 
    get encapsulated into a ... roulement de tambour ... a list ; exemple  '((...) (len ...))
    can have a name exemple: '...args' but need to start with '...' and is use without them args
-   '... 
+   '...
  + macro: function but they have a special stack frame and don't eval their arguments
  
  + make primitive to be powerful and let user make wrapper function to have convinent way of using the funtionnality ?

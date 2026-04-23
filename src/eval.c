@@ -967,8 +967,9 @@ bool primitive_list(void)
     TRY(VM_top1.size == 2, error_log("expected 2 elements for 'list' got %d", VM_top1.size));
     
     VM_top1 = VM_top1.list[1];
+    
     TRY(eval());
-
+     
     TRY(VM_top1.tag == tag_list, error_log("expected a list to build"));
     VM_push((List){
         .tag = tag_list,

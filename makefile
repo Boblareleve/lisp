@@ -1,6 +1,6 @@
 MAKEFLAGS += -j16
 
-.PHONY: all clean re san debug release tests
+.PHONY: all clean re san debug release tests profile
 
 
 
@@ -13,9 +13,10 @@ CFLAGS = -I$(MY_LIB)						\
 		 -Wno-address
 LFLAGS = -lm -lffi
 
-OBJ_DIR = obj
-SRC_DIR = src
-DEP_DIR = obj
+OBJ_DIR  = tmp
+SRC_DIR  = src
+DEP_DIR  = tmp
+# GCDA_DIR = tmp
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 
@@ -34,9 +35,11 @@ DEPS_RELEASE = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.release.d, $(SRCS))
 
 all: lisp san debug release
 
+EXES = lisp_d lisp_s lisp_r 
+
 clean:
 	rm -rf $(OBJ_DIR)
-	rm -rf $(EXE)
+	rm -f $(EXES)
 
 re: clean all
 
@@ -68,13 +71,26 @@ $(OBJ_DIR)/%.debug.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 release: lisp_r
 
-lisp_r: CFLAGS += -O1 -DNDEBUG
+lisp_r: CFLAGS += -O2 -DNDEBUG
 lisp_r: $(OBJS_RELEASE)
 	gcc -o lisp_r $^ $(LFLAGS) $(CFLAGS)
 
 $(OBJ_DIR)/%.release.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	gcc -c -o $@ $< $(CFLAGS)
 
+
+
+# profile: lisp_p
+
+# lisp_p: CFLAGS += -O2 -DNDEBUG
+# lisp_p: $(GCDA_DIR)/profile.gcda
+# 	gcc -fprofile-use -fprofile-correction -o lisp_p $^ $(LFLAGS) $(CFLAGS)
+
+# $(GCDA_DIR)/profile.gcda: $(SRCS) lisp_i
+# 	./lisp_i -s 100 $(shell find ./tests/unit -type f)
+
+# lisp_i: $(SRCS)
+# 	gcc -fprofile-generate -o lisp_i $(SRCS) $(CFLAGS) $(LFLAGS)
 
 
 lisp:
@@ -89,5 +105,14 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 # DIR ?= *
 EXE ?= lisp_s
 FILES ?= ../$(shell find ./tests/unit -type f)
+SAMPLES ?= 1
 tests: $(EXE)
-	@./$(EXE) ./tests/$(FILES)
+	@echo samples: $(SAMPLES)
+	@./$(EXE) -s $(SAMPLES) ./tests/$(FILES)
+
+tests_full: $(EXES)
+	@echo test all build samples: $(SAMPLES)
+	for exe in $(EXES); do \
+		echo $$exe: && ./$$exe -s $(SAMPLES) ./tests/$(FILES) || exit 1; \
+    done
+	

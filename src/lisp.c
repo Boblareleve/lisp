@@ -243,7 +243,7 @@ bool eval_function(void)
                         TRY(eval());
                     da_top(&args).value.list[j] = VM_top1;
                 }
-                
+
                 goto push_frame; // break but skip argument count check
             }
 
@@ -429,22 +429,23 @@ Lisp_context *Lisp_context_init(List root)
 {
     assert(root.tag == tag_list);
     Lisp_context *res = calloc(1, sizeof(*res));
+    assert(res);
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
     
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
     { // buildin types
-        add_simple_type("list",    LIST_TYPE);
-        add_simple_type("symbole", (List){ .tag = tag_type, .type_tag = tag_symbole   });
-        add_simple_type("int",     (List){ .tag = tag_type, .type_tag = tag_integer   });
-        add_simple_type("float",   (List){ .tag = tag_type, .type_tag = tag_real      });
-        add_simple_type("string",  (List){ .tag = tag_type, .type_tag = tag_string    });
-        add_simple_type("type",    (List){ .tag = tag_type, .type_tag = tag_type      });
-        add_simple_type("any",     (List){ .tag = tag_type, .type_tag = ttag_any_type });
+        add_primitive_type("list",    LIST_TYPE);
+        add_primitive_type("object",  (List){ .tag = tag_type, .type_tag = tag_object    });
+        add_primitive_type("symbole", (List){ .tag = tag_type, .type_tag = tag_symbole   });
+        add_primitive_type("int",     (List){ .tag = tag_type, .type_tag = tag_integer   });
+        add_primitive_type("float",   (List){ .tag = tag_type, .type_tag = tag_real      });
+        add_primitive_type("string",  (List){ .tag = tag_type, .type_tag = tag_string    });
+        add_primitive_type("type",    (List){ .tag = tag_type, .type_tag = tag_type      });
+        add_primitive_type("any",     (List){ .tag = tag_type, .type_tag = ttag_any_type });
     }
     
-
     return res;
 }
 

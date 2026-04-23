@@ -76,7 +76,7 @@ bool type_compatible(const List a, const List b)
     return true;
 }
 
-void add_simple_type(const char *name, List type)
+void add_primitive_type(const char *name, List type)
 {
     size_t name_len = strlen(name);
     set_Variable_insert(&g_ctx->variables, (Variable){ 
