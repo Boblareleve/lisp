@@ -227,8 +227,13 @@ bool test(const Strv str)
     return true;
 }
 
+#include <unistd.h>
 int main(int argc, char **argv)
 {
+    {
+        char buf[1024];
+        printf("FROM: %s\n", getcwd(buf, sizeof(buf)));
+    }
     init_primitive_map();
     test_get_Primitive();
 

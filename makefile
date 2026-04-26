@@ -104,11 +104,11 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 
 # DIR ?= *
 EXE ?= lisp_s
-FILES ?= ../$(shell find ./tests/unit -type f)
+FILES ?= $(shell find ./tests/* -type f -name "*.lisp")
 SAMPLES ?= 1
 tests: $(EXE)
 	@echo samples: $(SAMPLES)
-	@./$(EXE) -s $(SAMPLES) ./tests/$(FILES)
+	@./$(EXE) -s $(SAMPLES) $(FILES)
 
 tests_full: $(EXES)
 	@echo test all build samples: $(SAMPLES)

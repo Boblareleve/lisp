@@ -960,6 +960,23 @@ bool primitive_or(void)
 
 /* List */
 
+// (== (parse "1 2 3") (1 2 3))
+bool primitive_parses(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "parses"));
+
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'parses' got %d", VM_top1.size));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    
+    TRY(VM_top1.tag == tag_string, error_log("expected a string to parse got %s", tag_to_string(VM_top1.tag)));
+    TRY(lists(List_to_Strv(VM_top1), &VM_top1));
+
+    return true;
+}
+
+
 bool primitive_list(void)
 { // create a copy of element 1 but with evaluated elements
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "list"));
@@ -1163,12 +1180,15 @@ bool primitive_dereference(void)
     return true;
 }
 
+
 /* Others */
 
 bool primitive_print(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "print"));
     TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'print' got %d", VM_top1.size));
+
+    
 
     VM_push(NIL_LIST);
     for (int i = 1; i < VM_top2.size; i++)
@@ -1179,31 +1199,6 @@ bool primitive_print(void)
     }
     VM_pop;
     VM_top1 = NIL_LIST;
-    return true;
-}
-
-bool primitive_format(void)
-{
-    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "format"));
-    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'format' got %d", VM_top1.size));
-
-    static Strb acc = {0};
-    acc.size = 0;
-
-    for (int i = 1; i < VM_top1.size; i++)
-    {
-        // List tmp = {0};
-        VM_push(VM_top1.list[i]);
-        TRY(eval());
-        TRY(dump(&acc, VM_top1));
-        VM_pop;
-    }
-    
-    VM_top1 = (List){
-        .tag = tag_string,
-        .size = acc.size,
-        .str = List_duplicate(acc.arr, acc.size)
-    };
     return true;
 }
 
@@ -1250,6 +1245,67 @@ bool primitve_multi(void)
     return true;
 }
 
+
+/* String */
+
+bool primitive_format(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "format"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'format' got %d", VM_top1.size));
+
+    static Strb acc = {0};
+    acc.size = 0;
+
+    for (int i = 1; i < VM_top1.size; i++)
+    {
+        // List tmp = {0};
+        VM_push(VM_top1.list[i]);
+        TRY(eval());
+        TRY(dump(&acc, VM_top1));
+        VM_pop;
+    }
+    
+    VM_top1 = (List){
+        .tag = tag_string,
+        .size = acc.size,
+        .str = List_duplicate(acc.arr, acc.size)
+    };
+    return true;
+}
+
+
+static inline bool string_symbole_like(const List str)
+{
+    TRY(VM_top1.tag == tag_string, error_log("expected a string got %s", tag_to_string(VM_top1.tag)));
+    for (int i = 0; i < str.size; i++)
+    {
+        TRY(!isspace(str.str[i]), error_log("symbole can't contains white space"));
+    }
+    return true;
+}
+
+bool primitive_symbole(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "symbole"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'symbole' got %d", VM_top1.size));
+    TRY(string_symbole_like(VM_top1));
+    VM_top1.tag = tag_symbole;
+    
+    return true;
+}
+
+bool primitive_string(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "string"));
+    TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'string' got %d", VM_top1.size));
+    TRY(VM_top1.tag == tag_symbole, error_log("expected a symbole got %s", tag_to_string(VM_top1.tag)));
+    VM_top1.tag = tag_string;
+    
+    return true;
+}
+
+
+
 /* Types */
 
 bool primitive_typeof(void)
@@ -1290,6 +1346,125 @@ bool primitive_type(void)
     VM_top2 = VM_top1;
     VM_pop;
     
+    return true;
+}
+
+
+/* Files */
+
+// (read_all "file.txt")
+bool primitive_read_all(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "read_all"));
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'read_all' got %d", VM_top1.size));
+
+
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_string);
+    
+    char file_name[512];
+    TRY(VM_top1.size+1 < 512, error_log("file name too long"));
+    strncpy(file_name, VM_top1.str, MIN(sizeof(file_name), VM_top1.size));
+    file_name[VM_top1.size] = '\0';
+
+    errno = 0;
+    Strb str = {0};
+    TRY(Str_error_no_error == Strb_cat_file(&str, file_name), Strb_free(str); error_log("can't read file \"%s\": %s", file_name, strerror(errno)));
+    TRY(str.size + 1 < UINT16_MAX, Strb_free(str));
+
+    VM_top1 = (List){
+        .tag = tag_string,
+        .size = str.size,
+        .str = List_delc_alloc(str.arr, str.size + 1)
+    };
+
+    // FILE *file_handel = fopen(file_name, "r");
+    // TRY(file_handel, error_log("can't open file %s: %s", file_name, strerror(errno)));
+    // TRY(fseek(file_handel, 0, SEEK_END), error_log("can't read file (fseed end): %s", strerror(errno)));
+    // long file_size = ftell(file_handel);
+    // TRY(file_size != -1, error_log("can't read file (ftell): %s", strerror(errno)));
+    // TRY(file_size+1 < UINT16_MAX, error_log("file too long TODO: long string"));
+    // if (file_size == 0) // empty file
+    // {
+    //     VM_top1.str = NULL;
+    //     VM_top1.size = 0;
+    // }
+    // TRY(!fseek(file_handel, 0, SEEK_SET), error_log("can't read file (fseek SET): %s", strerror(errno)));
+    // VM_top1 = (List){
+    //     .size = file_size,
+    //     .str = List_alloc(file_size)
+    // };
+    // int bytes_read = fread(VM_top1.str, sizeof(char), file_size, file_handel);
+    // assert(bytes_read == file_size);
+    // TRY(!ferror(file_handel), error_log("can't read file (fread): %s", strerror(errno)));
+    // TRY(!fclose(file_handel), error_log("can't close file %s", strerror(errno)));
+
+    return true;
+}
+
+// (import "file.txt")
+bool primitive_import(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "import"));
+
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'import' got %d", VM_top1.size));
+    
+    VM_top1 = VM_top1.list[1];
+    TRY(eval());
+    TRY(VM_top1.tag == tag_string, error_log("expected a string as file name to import got %s", tag_to_string(VM_top1.tag)));
+    
+
+    Strb str = {0}; { // set VM_TOP1 a string of the file (str hold the memory)
+        
+        bool found = false;
+        char file_name[512];
+        TRY(VM_top1.size + 1u < sizeof(file_name), error_log("file name too long"));
+
+        da_for (List, path, &g_ctx->paths)
+        {
+            size_t sb_size = 0;
+            if (sb_size + path->size + 1u >= sizeof(file_name)) continue;
+            strncpy(&file_name[sb_size], path->str, path->size);
+            sb_size += path->size;
+
+            if (sb_size + path->size + 1u >= sizeof(file_name)) continue;
+            strncpy(&file_name[sb_size], VM_top1.str, VM_top1.size);
+            sb_size += VM_top1.size;
+
+            file_name[sb_size] = '\0';
+
+            str.size = 0;
+            errno = 0;
+            if (Strb_cat_file(&str, file_name) == Str_error_no_error)
+            {
+                found = true;
+                TRY(str.size + 1 < UINT16_MAX, Strb_free(str));
+                break;
+            }
+        }
+        TRY(found, Strb_free(str); error_log("can't read file \"%sv\": %s", &List_to_Strv(VM_top1), strerror(errno)));
+        
+        
+        VM_top1 = (List){
+            .tag = tag_string,
+            .size = str.size,
+            .str = str.arr
+        };
+    }
+
+    TRY(lists(List_to_Strv(VM_top1), &VM_top1), Strb_free(str));
+    Strb_free(str);
+    assert(VM_top1.tag == tag_list);
+    VM_push(NIL_LIST);
+    for (int i = 0; i < VM_top2.size; i++)
+    {
+        VM_top1 = VM_top2.list[i];
+        TRY(eval());
+    }
+
+    VM_top2 = VM_top1;
+    VM_pop;
     return true;
 }
 
@@ -1377,6 +1552,12 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("list"),        .fun = primitive_list               },
     { .name = _cstr_to_List("array"),       .fun = primitive_array              },
     { .name = _cstr_to_List("multi"),       .fun = primitve_multi               },
+    { .name = _cstr_to_List("read_all"),    .fun = primitive_read_all           },
+    { .name = _cstr_to_List("symbole"),     .fun = primitive_symbole            },
+    { .name = _cstr_to_List("string"),      .fun = primitive_string             },
+    { .name = _cstr_to_List("parses"),      .fun = primitive_parses             },
+    { .name = _cstr_to_List("import"),      .fun = primitive_import             },
+    
 };
 
 /* uint32_t primitive_hash(const List str, uint32_t seed)
@@ -1417,6 +1598,7 @@ primitive_t get_Primitive(const List op)
 
 bool test_get_Primitive(void)
 {
+#ifdef DEBUG
     init_primitive_map();
 
     static_for (i, keys)
@@ -1426,6 +1608,7 @@ bool test_get_Primitive(void)
         (void)p;
         assert(keys[i].fun == p); // map[keys[i].name]);
     }
+#endif /* DEBUG */
     return true;
 }
 

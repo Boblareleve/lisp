@@ -170,11 +170,11 @@ static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
 {
-    TRY(g_ctx->vm_stack.size >= 2, error_log("expected two vm args to eval a function"));
-    TRY(VM_top1.tag == tag_list, error_log("function definition not a list"));
-    TRY(VM_top1.size >= 2, error_log("function definition too short expected at least the aguments then one statement"));
+    TRY(g_ctx->vm_stack.size >= 2,                      error_log("expected two vm args to eval a function"));
+    TRY(VM_top1.tag == tag_list,                        error_log("function definition not a list"));
+    TRY(VM_top1.size >= 2,                              error_log("function definition too short expected at least the aguments then one statement"));
     TRY(have_function_arguments_shape(VM_top1.list[0]), error_log("try to call a list that didn't match a function shape"));
-    TRY(VM_top2.size >= 1, error_log("expected anonyme for function call"));
+    TRY(VM_top2.size >= 1,                              error_log("expected anonyme for function call"));
     
     // those two have similar beaviour
     // macro: '('(a b) (+ (multi a) (multi b)))
@@ -206,7 +206,8 @@ bool eval_function(void)
             {
                 if (last_argument_have_hint)
                 { // function type
-                    TRY(i+1 == EF_VM_arg_def_count, error_log("two type not at the end")); // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
+                    // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
+                    TRY(i+1 == EF_VM_arg_def_count,                     error_log("two type not at the end"));
                     TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many or too little call argument"));
                     return_type = s->value;
                     continue;
@@ -445,6 +446,18 @@ Lisp_context *Lisp_context_init(List root)
         add_primitive_type("type",    (List){ .tag = tag_type, .type_tag = tag_type      });
         add_primitive_type("any",     (List){ .tag = tag_type, .type_tag = ttag_any_type });
     }
+
+    { // path to search for import
+        da_push(&res->paths, _cstr_to_List("./"));
+        da_push(&res->paths, _cstr_to_List("./std/"));
+        da_push(&res->paths, _cstr_to_List("/"));
+
+        // constraints
+        da_for (List, path, &res->paths)
+            assert(path->tag == tag_string
+                && path->size > 0
+                && path->str[path->size-1] == '/');
+    }
     
     return res;
 }
@@ -469,9 +482,11 @@ void Lisp_context_free(void)
     // GGGGGGGGGGGGGC!!
     garbage_collector();
 
+    da_free(&g_ctx->paths);
     set_void_ptr_free(&g_ctx->gc);
     Strb_free(g_ctx->error);
     free(g_ctx);
+
 
     g_ctx = NULL;
 }

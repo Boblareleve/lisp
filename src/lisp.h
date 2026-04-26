@@ -114,24 +114,26 @@ SET_TYPEDEF_HASH_SET(void_ptr); // gc
 
 typedef struct Lisp_context
 {
-    // globals
-    set_Variable variables; 
-    // set_Variable functions;
-    // set_Variable types;
+    
+    struct {
+        // globals
+        set_Variable variables; 
+        // stack (local)
+        da_Variable stack;
+        int frame_start; // macro/function
+        bool in_return; // indicate that the error is only a return mechanism
+                        // see with vm_stack
+        int macro_start;
+        bool in_break;
 
-    // stack (local)
-    da_Variable stack;
-    int frame_start; // macro/function
-    bool in_return; // indicate that the error is only a return mechanism
-                    // see with vm_stack
-    int macro_start;
-    bool in_break;
+        da_List vm_stack;
+        set_void_ptr gc;
+    };
     
     List root;
 
-    set_void_ptr gc;
+    da_List paths;
 
-    da_List vm_stack;
     Strb error;
 } Lisp_context;
 
@@ -196,7 +198,11 @@ static inline void *List_get_ptr(const List li)
     return NULL;
 }
 
-#define List_to_Strv(li) (assert((li).tag == tag_string || (li).tag == tag_symbole), (Strv){ .arr = (li).str, .size = (li).size })
+#define List_to_Strv(li) (Strv){ \
+    .arr = (assert((li).tag == tag_string || (li).tag == tag_symbole), (li).str), \
+    .size = (li).size \
+}
+
 #define _cstr_to_List(cstr) (List){ .tag = tag_string, .size = STRING_LEN(cstr), .str = cstr }
 #define _cstr_to_List_symbole(cstr) (List){ .tag = tag_symbole, .size = STRING_LEN(cstr), .str = cstr }
 #define List_str_equal(li1, li2) Strv_equal(List_to_Strv(li1), List_to_Strv(li2))

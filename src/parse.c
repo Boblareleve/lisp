@@ -146,7 +146,7 @@ List escaping(Strv str)
 bool list(Strv *str, List *li)
 {
     skip_comment(str);
-
+    
     TRY(li, error_log("no output list to parse"));
     TRY(Strv_first(*str) != ')', error_log("closing parent at root"));
     TRY(str->size > 0, error_log(EOF_error_msg));
@@ -166,7 +166,7 @@ bool list(Strv *str, List *li)
             Strv_inc(str); // can't be the end of file
             return true;
         }
-
+        
         Ar_save_point save = Ar_save(&arena);
         
         int capacity = 1;
