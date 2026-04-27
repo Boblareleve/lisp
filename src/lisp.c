@@ -317,7 +317,7 @@ bool eval(void)
             return true;
         }
         
-        TRY(VM_top1.list[0].tag == tag_symbole, error_log("unkown first list element primitive"));
+        TRY(VM_top1.list[0].tag == tag_symbole, error_log("unkown first list element primitive: '%.*s'", VM_top1.list[0].size, VM_top1.list[0].str));
         
         primitive_t primitive = get_Primitive(VM_top1.list[0]);
         if (primitive) return primitive();

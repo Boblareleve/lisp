@@ -2,7 +2,7 @@ TRUE
 
 (global 'map '((li list fun list)
 
-    (= li (copy li))
+    (= 'li (copy li))
     
     (local 'i 0)
     (while (< i (len li))

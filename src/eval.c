@@ -363,46 +363,86 @@ bool primitive_assign(void)
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "="));
     TRY(VM_top1.size == 3, error_log("expected 3 element for '=' got %d", VM_top1.size));
 
-    if (VM_top1.list[1].tag == tag_symbole)
-    {
-        VM_push(VM_top1.list[2]);
-        TRY(eval());
-        {
-            Variable *var = get_Variable(VM_top2.list[1]);
-            TRY(var, error_log("left is a symbole (%.*s) but there is no variable with this name", VM_top2.list[1].size, VM_top2.list[1].str));
-            if (var->value.tag == tag_reference)
-                *var->value.list = VM_top1; // need a way to change a reference in a variable
-            else
-                var->value = VM_top1;
-        }
-        VM_top2 = VM_top1;
-        VM_pop;
-
-        // TODO
-        // TRY(is_of_type(VM_top1, VM_top2.list[]))
-
-        return true;
-    }
-
     VM_push(VM_top1.list[1]);
-    if (VM_top1.tag != tag_reference)
-        TRY(eval());
+    TRY(eval());
+
+    SWAP(VM_top1, VM_top2);
+
+    VM_top1 = VM_top1.list[2];
+    TRY(eval());
+
+    // A <- B;
+    // 2[A] 1[B]
 
     
-    if (VM_top1.tag == tag_reference)
+    if (VM_top2.tag == tag_symbole)
     {
-        VM_push(VM_top2.list[2]);
-        TRY(eval());
-        *VM_top2.list = VM_top1; // if VM_top1 is a ref to VM_top2 loop
-        VM_top3 = VM_top1;
-        VM_pop;
-        VM_pop;
-        return true;
+        Variable *var = get_Variable(VM_top2);
+        TRY(var, error_log("left is a symbole (%.*s) but there is no variable with this name", VM_top2.size, VM_top2.str));
+        var->value = VM_top1;
+        // if (var->value.tag == tag_reference)
+            // *var->value.list = VM_top1; // need a way to change a reference in a variable
+        // else
+            // var->value = VM_top1;
+            
+        TRY(is_of_type(var->value, var->type));
     }
+    else if (VM_top2.tag == tag_reference)
+    {
+        assert(VM_top2.list);
+
+        *VM_top2.list = VM_top1;
+    }
+    else
+    {
+        error_log("expected a symbole or a reference to assign to got %s", tag_to_string(VM_top2.tag));
+        VM_pop;
+        return false;
+    }
+
+    VM_top2 = VM_top1;
     VM_pop;
-    error_log("expected a symbole or a reference to set to got %s", tag_to_string(VM_top1.list[1].tag));
-    return false;
+    
+    return true;
 }
+// { // change value of a variable
+//     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "="));
+//     TRY(VM_top1.size == 3, error_log("expected 3 element for '=' got %d", VM_top1.size));
+//     if (VM_top1.list[1].tag == tag_symbole)
+//     {
+//         VM_push(VM_top1.list[2]);
+//         TRY(eval());
+//         {
+//             Variable *var = get_Variable(VM_top2.list[1]);
+//             TRY(var, error_log("left is a symbole (%.*s) but there is no variable with this name", VM_top2.list[1].size, VM_top2.list[1].str));
+//             if (var->value.tag == tag_reference)
+//                 *var->value.list = VM_top1; // need a way to change a reference in a variable
+//             else
+//                 var->value = VM_top1;
+//         }
+//         VM_top2 = VM_top1;
+//         VM_pop;
+//         // TODO
+//         // TRY(is_of_type(VM_top1, VM_top2.list[]))
+//         return true;
+//     }
+//     VM_push(VM_top1.list[1]);
+//     if (VM_top1.tag != tag_reference)
+//         TRY(eval());  
+//     if (VM_top1.tag == tag_reference)
+//     {
+//         VM_push(VM_top2.list[2]);
+//         TRY(eval());
+//         *VM_top2.list = VM_top1; // if VM_top1 is a ref to VM_top2 loop
+//         VM_top3 = VM_top1;
+//         VM_pop;
+//         VM_pop;
+//         return true;
+//     }
+//     VM_pop;
+//     error_log("expected a symbole or a reference to set to got %s", tag_to_string(VM_top1.list[1].tag));
+//     return false;
+// }
 
 
 
@@ -568,7 +608,7 @@ bool primitive_plus(void)
         TRY(eval());
         
         VM_top2 = add_List(VM_top2, VM_top1);
-        TRY(!IS_NIL(VM_top2));
+        TRY(!IS_NIL(VM_top2), error_log("couldn't add"));
         VM_pop;
     }
     VM_top2 = VM_top1;
@@ -664,7 +704,7 @@ bool primitive_minus(void)
         TRY(eval());
         
         VM_top2 = sub_List(VM_top2, VM_top1);
-        TRY(!IS_NIL(VM_top2));
+        TRY(!IS_NIL(VM_top2), error_log("couldn't add"));
         VM_pop;
     }
     VM_top2 = VM_top1;
@@ -686,7 +726,7 @@ bool primitive_product(void)
         TRY(eval());
         
         VM_top2 = mult_List(VM_top2, VM_top1);
-        TRY(!IS_NIL(VM_top2));
+        TRY(!IS_NIL(VM_top2), error_log("couldn't multiply"));
         VM_pop;
     }
     VM_top2 = VM_top1;
@@ -708,7 +748,7 @@ bool primitive_div(void)
         TRY(eval());
         
         VM_top2 = div_List(VM_top2, VM_top1);
-        TRY(!IS_NIL(VM_top2));
+        TRY(!IS_NIL(VM_top2), error_log("couldn't div"));
         VM_pop;
     }
     VM_top2 = VM_top1;
@@ -730,7 +770,7 @@ bool primitive_integer_div(void)
         TRY(eval());
         
         VM_top2 = idiv_List(VM_top2, VM_top1);
-        TRY(!IS_NIL(VM_top2));
+        TRY(!IS_NIL(VM_top2), error_log("couldn't idiv"));
         VM_pop;
     }
     VM_top2 = VM_top1;
@@ -1188,7 +1228,7 @@ bool primitive_print(void)
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "print"));
     TRY(VM_top1.size >= 2, error_log("expected at least 2 elements for 'print' got %d", VM_top1.size));
 
-    
+
 
     VM_push(NIL_LIST);
     for (int i = 1; i < VM_top2.size; i++)

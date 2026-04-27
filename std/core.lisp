@@ -5,29 +5,24 @@
 ; to define a global 'variable
 (global 'var   '(('name value) (global name value) ))
 
-;; []=
+;; ([]= symbole|reference list int)
+(global '[]= '('(li list index int value any) (= (&[] li index) value) li))
+
+;; (_= sym value) <=> (= 'sym (_ sym value))
+(global '+= '('('name symbole value any) (= name (+ (multi 2 name) value))))
+(global '*= '('('name symbole value any) (= name (* (multi 2 name) value))))
+(global '-= '('('name symbole value any) (= name (- (multi 2 name) value))))
+(global '/= '('('name symbole value any) (= name (/ (multi 2 name) value))))
 
 
-;;  doesn't work name is not eval in (=) and (+)  
-(global '+= '('('name symbole value) (= name (+ name value))))
-(global '*= '('('name symbole value) (= name (* name value))))
-(global '-= '('('name symbole value) (= name (- name value))))
-(global '/= '('('name symbole value) (= name (/ name value))))
-(global '%= '('('name symbole value) (= name (% name value))))
-
-
-
-;; TODO: 
 (global 'for '('('iter symbole li list ...)
     (local '__i 0)
     (local iter ())
     (while (< __i (len li))
-        (= 'iter ([] li __i))
+        (= iter ([] li __i))
         (eval ...)
     )
 ))
-
-
 
 
 t

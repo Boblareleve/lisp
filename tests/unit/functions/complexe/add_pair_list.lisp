@@ -14,11 +14,11 @@ TRUE
     (local 'res 0)
     
     (while (&& a b)
-        (= res (* res 10))
+        (= 'res (* res 10))
         (local 'sum (get_sum a b))
-        (= res (+ res sum))
-        (= a (next a))
-        (= b (next b))
+        (= 'res (+ res sum))
+        (= 'a (next a))
+        (= 'b (next b))
     )
     res
 ))

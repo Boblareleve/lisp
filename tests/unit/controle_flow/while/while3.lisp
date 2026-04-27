@@ -5,7 +5,7 @@ EQUAL
 (local 'i 4)
 
 (while (!= i 0) 
-    (= sum (+ sum i))
+    (= 'sum (+ sum i))
     (-- i)
 )
 

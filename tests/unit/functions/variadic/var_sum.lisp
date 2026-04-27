@@ -5,7 +5,7 @@ EQUAL
     (local 'sum 0)
     (local 'i 0)
     (while (< i (len ...))
-        (= sum (+ sum ([] ... i)))
+        (= 'sum (+ sum ([] ... i)))
         (++ i)
     )
     sum
