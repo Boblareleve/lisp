@@ -79,13 +79,13 @@ bool type_compatible(const List a, const List b)
 void add_primitive_type(const char *name, List type)
 {
     size_t name_len = strlen(name);
-    set_Variable_insert(&g_ctx->variables, (Variable){ 
-        .name = (List){ 
-            .tag = tag_symbole, 
-            .size = name_len, 
+    set_Variable_insert(&g_ctx->variables, (Variable){
+        .name = (List){
+            .tag = tag_symbole,
+            .size = name_len,
             .str = List_duplicate(name, name_len)
         },
-        .value = type, 
+        .value = type,
         .type = TYPE_TYPE
     });
 }

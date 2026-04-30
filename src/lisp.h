@@ -97,7 +97,7 @@ struct List
         Foreign_fun *ffun;
     };
 };
-static_assert(sizeof(List) == 16);
+static_assert(sizeof(List) == 16, "List size is expected to be 16 bytes");
 
 
 struct Variable
@@ -114,7 +114,6 @@ SET_TYPEDEF_HASH_SET(void_ptr); // gc
 
 typedef struct Lisp_context
 {
-    
     struct {
         // globals
         set_Variable variables; 
@@ -129,6 +128,16 @@ typedef struct Lisp_context
         da_List vm_stack;
         set_void_ptr gc;
     };
+    
+    struct {
+        clock_t max_clean_up_quantum;
+        size_t max_clean_up_allocs_count;
+
+        clock_t last_clean_up; 
+        size_t allocs_count; // since last gc
+
+        bool paused; // turn on in copy and parsing to avoid unwandted trigger
+    } euristics;
     
     List root;
 
@@ -233,6 +242,7 @@ void Lisp_context_free(void);
 void *List_alloc(size_t count);
 void *List_delc_alloc(void *ptr, size_t count);
 void *List_duplicate(const void *src, size_t count);
+void trigger_gc(void);
 bool garbage_collector(void);
 
 // dl.c

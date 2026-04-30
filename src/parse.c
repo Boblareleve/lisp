@@ -101,14 +101,18 @@ bool skip_atom(Strv *str)
 
 
 
-List escaping(Strv str)
+List escaping(const Strv str)
 {
-    char buffer[512];
-    buffer[0] = 0;
-    Strv res = Strv_make(
-        (str.size < (int)sizeof(buffer)) ? buffer : malloc(str.size), // fallback to malloc if too large
-        0
-    );
+    // char buffer[512];
+    // buffer[0] = 0;
+    // Strv res = Strv_make(
+    //     (str.size < (int)sizeof(buffer)) ? buffer : malloc(str.size), // fallback to malloc if too large
+    //     0
+    // );
+    Strb sb = {0};
+    Strb_reserve(&sb, str.size);
+    assert(sb.capacity == 0 || sb.arr != NULL);
+    // res.size = 0;
 
     for (int i = 0; i < str.size; i++)
     {
@@ -118,33 +122,37 @@ List escaping(Strv str)
             assert(i < str.size);
             switch (str.arr[i])
             {
-            case '\\': res.arr[res.size++] = '\\'; break;
-            case 'n':  res.arr[res.size++] = '\n'; break;
-            case 't':  res.arr[res.size++] = '\t'; break;
-            case 'r':  res.arr[res.size++] = '\r'; break;
-            case 'v':  res.arr[res.size++] = '\v'; break;
-            case 'a':  res.arr[res.size++] = '\a'; break;
-            case 'b':  res.arr[res.size++] = '\b'; break;
-            case 'f':  res.arr[res.size++] = '\f'; break;
-            default:   res.arr[res.size++] = '?';  break; // unkown
+            case '\\': sb.arr[sb.size++] = '\\'; break;
+            case 'n':  sb.arr[sb.size++] = '\n'; break;
+            case 't':  sb.arr[sb.size++] = '\t'; break;
+            case 'r':  sb.arr[sb.size++] = '\r'; break;
+            case 'v':  sb.arr[sb.size++] = '\v'; break;
+            case 'a':  sb.arr[sb.size++] = '\a'; break;
+            case 'b':  sb.arr[sb.size++] = '\b'; break;
+            case 'f':  sb.arr[sb.size++] = '\f'; break;
+            default:   sb.arr[sb.size++] = '?';  break; // unkown
             }
             continue;
         }
-        res.arr[res.size++] = str.arr[i];
+        Strb_cat_char(&sb, str.arr[i]);
+        // res.arr[res.size++] = str.arr[i];
     }
 
     List result = {
         .tag = tag_string,
-        .size = res.size,
-        .str = List_duplicate(res.arr, res.size)
+        .size = sb.size,
+        .str = (sb.size > 0) ? List_duplicate(sb.arr, sb.size) : NULL
     };
-    if (str.size >= (int)sizeof(buffer)) free(res.arr);
+    Strb_free(sb);
     return result;
 }
 
 
 bool list(Strv *str, List *li)
 {
+    // assume gc paused
+    assert(g_ctx == NULL || g_ctx->euristics.paused);
+    
     skip_comment(str);
     
     TRY(li, error_log("no output list to parse"));
@@ -272,6 +280,8 @@ bool list(Strv *str, List *li)
 
 bool lists(Strv str, List *li)
 {
+    if (g_ctx) g_ctx->euristics.paused = true;
+
     Ar_save_point save = Ar_save(&arena);
 
     skip_comment(&str);
@@ -289,7 +299,7 @@ bool lists(Strv str, List *li)
             capacity += 4;
         }
         
-        TRY(list(&str, &li->list[li->size++]), body_List_free(*li); *li = NIL_LIST);
+        GOTRY(list(&str, &li->list[li->size++]));
         
         skip_comment(&str);
     }
@@ -297,5 +307,14 @@ bool lists(Strv str, List *li)
     li->list = List_duplicate(li->list, li->size * sizeof(List));
 
     Ar_restore(&arena, save);
+
+    if (g_ctx) g_ctx->euristics.paused = false;
+
     return true;
+fail:
+    body_List_free(*li);
+    *li = NIL_LIST;
+    if (g_ctx) g_ctx->euristics.paused = false;
+    
+    return false;
 }

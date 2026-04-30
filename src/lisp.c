@@ -1,5 +1,3 @@
-#define STRING_IMPLEMENTATION
-#define AR_IMPLEMENTATION
 #include "lisp.h"
 
 
@@ -81,7 +79,7 @@ static inline bool push_stack_frame(bool is_macro)
     assert(g_ctx);
 
     da_push(&g_ctx->stack, (Variable){
-        .name = _cstr_to_List_symbole(""),
+        .name = { .tag = tag_symbole },
         .value = { 
             .tag =     is_macro ? ttag_macro         : ttag_frame, 
             .integer = is_macro ? g_ctx->macro_start : g_ctx->frame_start
@@ -316,7 +314,7 @@ bool eval(void)
             TRY(eval_function(), error_log("failed to call inline function"));
             return true;
         }
-        
+
         TRY(VM_top1.list[0].tag == tag_symbole, error_log("unkown first list element primitive: '%.*s'", VM_top1.list[0].size, VM_top1.list[0].str));
         
         primitive_t primitive = get_Primitive(VM_top1.list[0]);
@@ -376,7 +374,9 @@ bool List_equal(const List li1, const List li2)
 }
 
 
-List List_copy(const List li)
+
+
+List List_copy_rec(const List li)
 {
     if (li.tag == tag_list)
     {
@@ -392,11 +392,21 @@ List List_copy(const List li)
         };
 
         for (size_t i = 0; i < li.size; i++)
-            res.list[i] = List_copy(li.list[i]);
+            res.list[i] = List_copy_rec(li.list[i]);
         
         return res;
     }
     return li;
+}
+List List_copy(const List li)
+{
+    if (g_ctx) g_ctx->euristics.paused = true;
+
+    List res = List_copy_rec(li);
+
+    if (g_ctx) g_ctx->euristics.paused = false;
+    
+    return res;
 }
 
 // !!shortcut GC!!
@@ -434,6 +444,13 @@ Lisp_context *Lisp_context_init(List root)
     res->gc = add_to_gc_context((set_void_ptr){0}, root);
     res->root = root;
     
+    res->euristics.last_clean_up = clock();
+    res->euristics.max_clean_up_quantum = USEC_TO_CLOCKS(10); // MSEC_TO_CLOCKS(100);
+    res->euristics.max_clean_up_allocs_count = 16; // 1024;
+
+    
+
+
     Lisp_context *old = g_ctx;
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
     { // buildin types

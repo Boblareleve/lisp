@@ -170,18 +170,19 @@ bool test(const Strv str)
         {
             VM_push(root.list[1]);
             TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
-            List first = VM_top1;
-            VM_pop;
-
+            
             VM_push(NIL_LIST);
             for (int i = 2; i < root.size; i++)
             {
                 VM_top1 = root.list[i];
                 TRY(eval(), fprintf(fd, STRV_FMT, STRV_UNPACK(g_ctx->error.view)); Lisp_context_free());
             }
+            
+            assert(g_ctx->vm_stack.size >= 2);
+            
+            List first = g_ctx->vm_stack.arr[0];
             List last = VM_top1;
             VM_pop;
-
             if (!List_equal(first, last))
             {
                 fprintf(fd, "expected: ");

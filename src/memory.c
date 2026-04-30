@@ -22,7 +22,19 @@ uint64_t set_void_ptr_hash(const void_ptr key, uint64_t seed)
 
 SET_IMPLEMENT_HASH_SET(void_ptr, ISNULL_VPTR, SETNULL_VPTR, 4, 0.8, 64);
 
+#define GC_ALLWAYS_TRIGGER
+void trigger_gc(void)
+{
+    if (g_ctx->euristics.paused) return;
 
+#ifdef GC_ALLWAYS_TRIGGER
+    garbage_collector();
+#else
+    if (clock() - g_ctx->euristics.last_clean_up >= g_ctx->euristics.max_clean_up_quantum
+     || g_ctx->euristics.allocs_count            >= g_ctx->euristics.max_clean_up_allocs_count)
+        garbage_collector();
+#endif
+}
 
 void *List_alloc(size_t count)
 {
@@ -31,22 +43,25 @@ void *List_alloc(size_t count)
     if (!g_ctx) // if no context -> allocation in the parsing phase the allocation will be register only on program startup
         return mem;
     
-    
-    set_void_ptr_insert(&g_ctx->gc, mem);
+    trigger_gc();
 
+    set_void_ptr_insert(&g_ctx->gc, mem);
+    g_ctx->euristics.allocs_count++;
     return mem;
 }
 
 void *List_delc_alloc(void *ptr, size_t count)
 {
     UNUSED(count);
-    
     assert(((uintptr_t)ptr & 0b1) == 0);
-
+    
     if (!g_ctx)
         return ptr;
+    
+    trigger_gc();
 
     set_void_ptr_insert(&g_ctx->gc, ptr);
+    g_ctx->euristics.allocs_count++;
     return ptr;
 }
 
@@ -62,29 +77,11 @@ void *List_duplicate(const void *src, size_t count)
 
 
 #define GC_TAG 0x1
-bool is_gc_tag(void *ptr)
-{
-    return ((uintptr_t)ptr & GC_TAG) == GC_TAG;
-}
-void *gc_tag(void *ptr)
-{
-    return (void*)((uintptr_t)ptr | GC_TAG);
-}
-void *gc_untag(void *ptr)
-{
-    return (void*)((uintptr_t)ptr & ~GC_TAG);
-}
+bool is_gc_tag(void *ptr)   { return ((GC_TAG & (uintptr_t)ptr) == GC_TAG);  }
+void *gc_tag(void *ptr)     { return    (void*)((uintptr_t)ptr  |  GC_TAG);  }
+void *gc_untag(void *ptr)   { return    (void*)((uintptr_t)ptr  & ~GC_TAG);  }
 
 
-
-
-int void_ptr_cmp(const void *a, const void *b)
-{
-    const void * const *pa = a;
-    const void * const *pb = b;
-
-    return *pa - *pb;
-}
 
 void gc_traverse_mark(List li)
 {
@@ -95,6 +92,16 @@ void gc_traverse_mark(List li)
         void **f = set_void_ptr_get(&g_ctx->gc, ptr);
         if (!f)
         {
+#ifdef FSAN
+            if (!set_void_ptr_contains(&g_ctx->gc, gc_tag(ptr)))
+            {
+                // intentional double free to trigger fsan
+                // char dumb = *(char*)ptr;
+                // free(ptr);
+                // dumb = *(char*)ptr;
+                // (void)dumb;
+            }
+#endif
             assert(set_void_ptr_contains(&g_ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
             return; // if it was not found -> already poisoned
         }
@@ -196,6 +203,7 @@ void gc_tag_context(void)
 bool garbage_collector(void)
 {
     TRY(g_ctx);
+
     
     gc_tag_context();
     
@@ -205,16 +213,19 @@ bool garbage_collector(void)
 #endif
     
     erase_untag(&g_ctx->gc);
-
+    
     set_for (void_ptr, it, &g_ctx->gc)
         *it = gc_untag(*it);
-
+    
 #ifdef GC_REPORT
     printf("gc stats: %ld freed for %ld chunks (%.2lf%%) ", 
         pointers_count - g_ctx->gc.size, pointers_count, 
         (1.0 - (double)g_ctx->gc.size / pointers_count) * 100.0
     );
 #endif
-
+    
+    g_ctx->euristics.allocs_count = 0;
+    g_ctx->euristics.last_clean_up = clock();
+    
     return true;
 }
