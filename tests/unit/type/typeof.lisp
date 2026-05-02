@@ -4,6 +4,8 @@ EQUAL
     string
     int
     float
+    number
+    number
     type
     list
     symbole 
@@ -19,6 +21,8 @@ EQUAL
     (typeof "bla")
     (typeof 3245)
     (typeof 49.2)
+    (typeof 1)
+    (typeof 1.0)
     (typeof any)
     (typeof '())
     (typeof 'a)

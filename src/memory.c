@@ -26,7 +26,7 @@ SET_IMPLEMENT_HASH_SET(void_ptr, ISNULL_VPTR, SETNULL_VPTR, 4, 0.8, 64);
 void trigger_gc(void)
 {
     if (g_ctx->euristics.paused) return;
-
+    
 #ifdef GC_ALLWAYS_TRIGGER
     garbage_collector();
 #else

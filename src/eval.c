@@ -405,45 +405,6 @@ bool primitive_assign(void)
     
     return true;
 }
-// { // change value of a variable
-//     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "="));
-//     TRY(VM_top1.size == 3, error_log("expected 3 element for '=' got %d", VM_top1.size));
-//     if (VM_top1.list[1].tag == tag_symbole)
-//     {
-//         VM_push(VM_top1.list[2]);
-//         TRY(eval());
-//         {
-//             Variable *var = get_Variable(VM_top2.list[1]);
-//             TRY(var, error_log("left is a symbole (%.*s) but there is no variable with this name", VM_top2.list[1].size, VM_top2.list[1].str));
-//             if (var->value.tag == tag_reference)
-//                 *var->value.list = VM_top1; // need a way to change a reference in a variable
-//             else
-//                 var->value = VM_top1;
-//         }
-//         VM_top2 = VM_top1;
-//         VM_pop;
-//         // TODO
-//         // TRY(is_of_type(VM_top1, VM_top2.list[]))
-//         return true;
-//     }
-//     VM_push(VM_top1.list[1]);
-//     if (VM_top1.tag != tag_reference)
-//         TRY(eval());  
-//     if (VM_top1.tag == tag_reference)
-//     {
-//         VM_push(VM_top2.list[2]);
-//         TRY(eval());
-//         *VM_top2.list = VM_top1; // if VM_top1 is a ref to VM_top2 loop
-//         VM_top3 = VM_top1;
-//         VM_pop;
-//         VM_pop;
-//         return true;
-//     }
-//     VM_pop;
-//     error_log("expected a symbole or a reference to set to got %s", tag_to_string(VM_top1.list[1].tag));
-//     return false;
-// }
-
 
 
 /* controle flow */
@@ -1053,7 +1014,7 @@ bool primitive_eval(void)
 
     VM_top1 = VM_top1.list[1];
     TRY(eval());
-    TRY(VM_top1.tag == tag_list, error_log("TODO"));
+    TRY(VM_top1.tag == tag_list, error_log("expected a list to eval in the eval primitive got %s", tag_to_string(VM_top1.tag)));
 
     VM_push(NIL_LIST);
     for (int i = 0; i < VM_top2.size; i++)
@@ -1255,18 +1216,28 @@ bool primitive_dollar(void)
 {
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "$"));
     TODO("$");
-    /* TRY(li.size >= 3, error_log("expected at least 2 elements for '$' got %d", li.size));
 
-    TRY(eval(li.list[1], &res));
+    // ($ 1 + 1) -> (+ 1 1) -> 2
+    // ($ 1 print 1) -> (print 1 1) -> stdout: "11"
+    // the temp list can be allocated in the vm_stack
+    // or
+    
+    return true;
+}
+bool primitive_math(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "@"));
+    TODO("@");
 
-    for (int i = 2; i < li.size; i++)
-    {
-    }
-    *out = res; */
+    // (@ 1 + 2 * 3) -> (+ 1 (* 2 3)) -> 7
+    // (@ 1 * (2 + 1)) -> (* 1 (+ 2 1))
+    // (@ 1 + 2 + 1) -> (+ 1 2 1)
+    // harder, but more useful
+
     return true;
 }
 
-bool primitve_multi(void)
+bool primitive_multi(void)
 { // eval multiple time value
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "multi"));
     TRY(VM_top1.size == 3, error_log("expected 3 elements (multi COUNT TO_EVAL) got %d", VM_top1.size));
@@ -1281,6 +1252,17 @@ bool primitve_multi(void)
 
     VM_top3 = VM_top1;
     VM_pop; VM_pop;
+
+    return true;
+}
+
+bool primitive_garbage(void)
+{
+    EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "garbage"));
+    TRY(VM_top1.size == 1, error_log("expected 1 elements (garbage) got %d", VM_top1.size));
+
+    if (!g_ctx->euristics.paused)
+        trigger_gc();
 
     return true;
 }
@@ -1360,31 +1342,94 @@ bool primitive_typeof(void)
     return true;
 }
 
+
+// take an offseted from primitive_type
+bool type(void)
+{
+    TRY(VM_top1.size > 0, error_log("empty type"));
+
+    // simple type
+    if (VM_top1.size == 1)
+    {
+        VM_top1 = VM_top1.list[0];
+        TRY(eval());
+
+        // directly a type
+        if (VM_top1.tag != tag_type)
+        {
+            // or infer it
+            
+            if (VM_top1.tag == tag_list)
+            {
+                // () -> n = 0 tuple
+                // (1) -> (int)
+                // 
+                VM_push((List){
+                    .tag = tag_type,
+                    .type_tag = ttag_tuple_type,
+                    .size = VM_top1.size,
+                    .list = List_alloc(sizeof(List) * VM_top1.size)
+                });
+
+                TODO("");
+                return true;
+            }
+            VM_top1 = (List){
+                .tag = tag_type,
+                .type_tag = VM_top1.tag,
+            };
+        }
+        return true;
+    }
+
+    if (List_equal_lit(VM_top1.list[1], "|"))
+    {
+        return true;
+    }
+    
+    // tuple type 
+
+    return true;
+}
+
+// (type 1 | 1.0) -> tuple 1 element of int or float
+// (type 1 1.0) -> tuple 2 elements: int, float
+// (type type) -> typle 1 elements: type (meta)
 bool primitive_type(void)
 { // make a type out of a list
     EVAL_LIST_ASSERT(List_equal_lit(VM_top1.list[0], "type"));
-    TODO("type");
-    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'type' got %d", VM_top1.size));
-    VM_push((List){
-        .tag = tag_type,
-        .type_tag = VM_top1.list[1].tag,
-    });
-    if (VM_top1.type_tag == tag_list)
-    {
-        VM_top1.size = VM_top2.list[1].size,
-        VM_top1.list = List_alloc(sizeof(List) * VM_top1.size);
 
-        VM_push(NIL_LIST);
-        for (int i = 0; i < VM_top3.list[1].size; i++)
-        {
-            VM_top1 = VM_top3.list[1].list[i];
-            TRY(primitive_type());
-            VM_top2.list[i] = VM_top1;
-        }
-        VM_pop;
-    }
-    VM_top2 = VM_top1;
-    VM_pop;
+    TRY(VM_top1.size == 2, error_log("expected 2 elements for 'type' got %d", VM_top1.size));
+    VM_top1 = VM_top1.list[1];
+
+    
+
+
+    // for (int i = 1; i < VM_top2.size; i++)
+    // {
+    //     if (i + 1 < VM_top2.size)
+    //     {
+    //         TRY(List_equal_lit(VM_top2.list[i+1], "|"), error_log("invalid type desc expected a '|' for a union type"));
+    //         TRY(i+2 < VM_top2.size, error_log("invalid type desc expected another type after '|'"));
+    //         ;
+    //         continue;
+    //     }
+    // }
+    // if (VM_top1.type_tag == tag_list)
+    // {
+    //     VM_top1.size = VM_top2.list[1].size,
+    //     VM_top1.list = List_alloc(sizeof(List) * VM_top1.size);
+    //     VM_push(NIL_LIST);
+    //     for (int i = 0; i < VM_top3.list[1].size; i++)
+    //     {
+    //         VM_top1 = VM_top3.list[1].list[i];
+    //         TRY(primitive_type());
+    //         VM_top2.list[i] = VM_top1;
+    //     }
+    //     VM_pop;
+    // }
+    // VM_top2 = VM_top1;
+    // VM_pop;
     
     return true;
 }
@@ -1418,27 +1463,6 @@ bool primitive_read_all(void)
         .size = str.size,
         .str = List_delc_alloc(str.arr, str.size + 1)
     };
-
-    // FILE *file_handel = fopen(file_name, "r");
-    // TRY(file_handel, error_log("can't open file %s: %s", file_name, strerror(errno)));
-    // TRY(fseek(file_handel, 0, SEEK_END), error_log("can't read file (fseed end): %s", strerror(errno)));
-    // long file_size = ftell(file_handel);
-    // TRY(file_size != -1, error_log("can't read file (ftell): %s", strerror(errno)));
-    // TRY(file_size+1 < UINT16_MAX, error_log("file too long TODO: long string"));
-    // if (file_size == 0) // empty file
-    // {
-    //     VM_top1.str = NULL;
-    //     VM_top1.size = 0;
-    // }
-    // TRY(!fseek(file_handel, 0, SEEK_SET), error_log("can't read file (fseek SET): %s", strerror(errno)));
-    // VM_top1 = (List){
-    //     .size = file_size,
-    //     .str = List_alloc(file_size)
-    // };
-    // int bytes_read = fread(VM_top1.str, sizeof(char), file_size, file_handel);
-    // assert(bytes_read == file_size);
-    // TRY(!ferror(file_handel), error_log("can't read file (fread): %s", strerror(errno)));
-    // TRY(!fclose(file_handel), error_log("can't close file %s", strerror(errno)));
 
     return true;
 }
@@ -1582,6 +1606,7 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("||"),          .fun = primitive_or                 },
     { .name = _cstr_to_List("for"),         .fun = primitive_for                },
     { .name = _cstr_to_List("format"),      .fun = primitive_format             },
+    { .name = _cstr_to_List("garbage"),     .fun = primitive_garbage            },
     { .name = _cstr_to_List("quote"),       .fun = primitive_quote              },
     { .name = _cstr_to_List("typeof"),      .fun = primitive_typeof             },
     { .name = _cstr_to_List("eval"),        .fun = primitive_eval               },
@@ -1591,7 +1616,7 @@ static const Primitive keys[] = {
     { .name = _cstr_to_List("dereference"), .fun = primitive_dereference        },
     { .name = _cstr_to_List("list"),        .fun = primitive_list               },
     { .name = _cstr_to_List("array"),       .fun = primitive_array              },
-    { .name = _cstr_to_List("multi"),       .fun = primitve_multi               },
+    { .name = _cstr_to_List("multi"),       .fun = primitive_multi              },
     { .name = _cstr_to_List("read_all"),    .fun = primitive_read_all           },
     { .name = _cstr_to_List("symbole"),     .fun = primitive_symbole            },
     { .name = _cstr_to_List("string"),      .fun = primitive_string             },

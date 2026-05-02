@@ -110,16 +110,7 @@ static inline bool pop_stack_frame(bool is_macro)
     g_ctx->stack.size = g_ctx->frame_start-1;
     assert(g_ctx->stack.arr[g_ctx->stack.size].value.tag == ttag_frame);
     g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
-
-    // TODO("");
-    // do {
-    //     TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
-    //     g_ctx->stack.size = g_ctx->frame_start-1;
-    //     g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
-
-    // } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
-    //         == (!is_macro ? ttag_macro : ttag_frame));
-
+    
     return true;
 }
 
@@ -165,6 +156,44 @@ static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
     return false; // true error
 }
 
+static inline bool parse_function_prototype_type(const List prototype, int *index, List first_type, List *res)
+{
+    int count = 1;
+    int i = *index;
+    while (i + 2 < prototype.size 
+     && List_equal_lit(prototype.list[i+1], "|")
+    ) {
+        TRY(i + 2 < prototype.size, error_log("expected a type after '|' reach the end of the argument list"));
+        i += 2;
+        count++;
+    }
+    if (count == 1)
+    {
+        *res = first_type;
+        return true;
+    }
+
+    *res = (List){
+        .tag = tag_type,
+        .type_tag = ttag_union_type,
+        .size = count,
+        .list = List_alloc(sizeof(List) * count)
+    };
+    assert(count > 1);
+    res->list[0] = first_type;
+    for (i = 1; i < count; i++)
+    {
+        const int idx = *index + i*2;
+        Variable *type = get_global_Variable(prototype.list[idx]);
+        TRY(type, error_log("could not find type '%.*s'", prototype.list[idx].size, prototype.list[idx].str));
+        res->list[i] = type->value;
+    }
+
+    *index += 2 * count - 1;
+    return true;
+}
+
+
 // 2[(_, ...call_arguments)] 1[((...call_arguments_definition) ...function_body)]
 bool eval_function(void)
 {
@@ -204,13 +233,15 @@ bool eval_function(void)
             {
                 if (last_argument_have_hint)
                 { // function type
-                    // TODO '|' || (VM_top2.list[i+2].tag == tag_symbole && ))
-                    TRY(i+1 == EF_VM_arg_def_count,                     error_log("two type not at the end"));
-                    TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many or too little call argument"));
-                    return_type = s->value;
+                    // TRY(i+1 == EF_VM_arg_def_count,                     error_log("two type not at the end"));
+                    // TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many or too little call argument"));
+                    TRY(parse_function_prototype_type(VM_top2.list[0], &i, s->value, &return_type));
+                    // return_type = s->value;
                     continue;
                 }
-                da_top(&args).type = s->value;
+                TRY(parse_function_prototype_type(VM_top2.list[0], &i, s->value, &da_top(&args).type));
+                // da_top(&args).type = s->value;
+
                 TRY(is_of_type(da_top(&args).value, da_top(&args).type), error_log("argument %d did not match it's type hint", args.size - args_point - 1));
                 last_argument_have_hint = true;
                 continue;
@@ -262,7 +293,7 @@ bool eval_function(void)
             
             last_argument_have_hint = false;
         }
-        TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", EF_VM_arg_call_count, args.size - args_point));
+        TRY(args.size - args_point == EF_VM_arg_call_count, error_log("too many argument in function call expecting %d got %d", args.size - args_point, EF_VM_arg_call_count));
         
     push_frame:
         push_stack_frame(is_macro);
@@ -311,7 +342,7 @@ bool eval(void)
         {
             VM_push(VM_top1.list[0]);
             TRY(eval());
-            TRY(eval_function(), error_log("failed to call inline function"));
+            TRY(eval_function()); // , error_log("failed to call inline function"));
             return true;
         }
 
@@ -367,7 +398,7 @@ bool List_equal(const List li1, const List li2)
     case tag_string:    return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_symbole:   return Strv_equal(List_to_Strv(li1), List_to_Strv(li2));
     case tag_true:      return li2.tag == tag_true;
-    case tag_type:      return type_compatible(li1, li2);
+    case tag_type:      return type_equal(li1, li2);
     default: UNREACHABLE("List equal");
     }
     return false;
@@ -455,13 +486,23 @@ Lisp_context *Lisp_context_init(List root)
     start_body_end (set_Lisp_context(res), set_Lisp_context(old))
     { // buildin types
         add_primitive_type("list",    LIST_TYPE);
-        add_primitive_type("object",  (List){ .tag = tag_type, .type_tag = tag_object    });
-        add_primitive_type("symbole", (List){ .tag = tag_type, .type_tag = tag_symbole   });
-        add_primitive_type("int",     (List){ .tag = tag_type, .type_tag = tag_integer   });
-        add_primitive_type("float",   (List){ .tag = tag_type, .type_tag = tag_real      });
-        add_primitive_type("string",  (List){ .tag = tag_type, .type_tag = tag_string    });
-        add_primitive_type("type",    (List){ .tag = tag_type, .type_tag = tag_type      });
-        add_primitive_type("any",     (List){ .tag = tag_type, .type_tag = ttag_any_type });
+        add_primitive_type("ints",    (List){ .type_tag = ttag_any_list_type, .type_list_tag = tag_integer });
+        add_primitive_type("object",  (List){ .type_tag = tag_object         });
+        add_primitive_type("symbole", (List){ .type_tag = tag_symbole        });
+        add_primitive_type("int",     (List){ .type_tag = tag_integer        });
+        add_primitive_type("float",   (List){ .type_tag = tag_real           });
+        add_primitive_type("string",  (List){ .type_tag = tag_string         });
+        add_primitive_type("type",    (List){ .type_tag = tag_type           });
+        add_primitive_type("any",     (List){ .type_tag = ttag_any_type      });
+        List tnum = { 
+            .tag = tag_type, .type_tag = ttag_union_type,
+            .size = 2,
+            .list = List_alloc(sizeof(List) * 2)
+        };
+        tnum.list[0] = (List){ .tag = tag_type, .type_tag = tag_integer };
+        tnum.list[1] = (List){ .tag = tag_type, .type_tag = tag_real    };
+        
+        add_primitive_type("number",  tnum);
     }
 
     { // path to search for import

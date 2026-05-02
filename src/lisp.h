@@ -24,11 +24,19 @@ typedef enum List_tag : uint8_t
     tag_real,      // 3.3
     tag_type,      // int...
     tag_reference,
+
+    // unimplemented
     tag_object,
     tag_void_ptr,  // C struct handel
     tag_dynamic_lib,
     tag_foreign_function, // Foreign_fun
+    
     ttag_any_type, // can only be use in type_tag fild of List 
+    ttag_union_type,    // T1 | T2 | T3 // additif type 
+    ttag_tuple_type,    // (T1 T2 T3)   // product type 
+    ttag_array_type,    // (T T T T T)  // a list of n element of the same type
+    ttag_any_list_type, // (...)        // a list
+
     ttag_frame, // to indicate the in a variable the value associated is a the index to the start of the previous frame
     ttag_macro, // to indicate start of a macro stack frame  
 } List_tag;
@@ -62,7 +70,7 @@ typedef struct
 #define TYPE_UNDEFINED_LIST_SIZE UINT16_MAX
 #define TYPE_TYPE ((List){ .tag = tag_type, .type_tag = tag_type })
 #define ANY_TYPE ((List){ .tag = tag_type, .type_tag = ttag_any_type })
-#define LIST_TYPE (List){ .tag = tag_type, .type_tag = tag_list, .size = TYPE_UNDEFINED_LIST_SIZE }
+#define LIST_TYPE (List){ .tag = tag_type, .type_tag = ttag_any_list_type }
 
 
 typedef struct List List;
@@ -82,7 +90,8 @@ struct List
     List_tag tag;
     uint8_t quote_count; // how many reference "(QUOTE self)" depth it is
     List_tag type_tag;   // for type only
-    uint8_t __pad[1];    // padding
+    List_tag type_list_tag; // for type only what element the list contains
+    // uint8_t __pad[1];       // padding
 
     uint16_t offset; // only to get back the start of the allocated chunk
     uint16_t size;   // count of bytes in string/symbole or List in a list
@@ -208,8 +217,8 @@ static inline void *List_get_ptr(const List li)
 }
 
 #define List_to_Strv(li) (Strv){ \
-    .arr = (assert((li).tag == tag_string || (li).tag == tag_symbole), (li).str), \
-    .size = (li).size \
+    .arr =  ((li).tag == tag_string || (li).tag == tag_symbole) ? (li).str  : NULL, \
+    .size = ((li).tag == tag_string || (li).tag == tag_symbole) ? (li).size : 0     \
 }
 
 #define _cstr_to_List(cstr) (List){ .tag = tag_string, .size = STRING_LEN(cstr), .str = cstr }
@@ -253,9 +262,8 @@ bool get_fun_dl(List lib, List *out, const List name, const List desc);
 // type.c
 bool have_function_arguments_shape(const List li);
 bool is_of_type(const List li, const List type);
-bool type_equal(const List a, const List b);
 void add_primitive_type(const char *name, List type);
-bool type_compatible(const List a, const List b);
+bool type_equal(const List t1, const List t2);
 
 
 
