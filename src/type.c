@@ -105,7 +105,7 @@ void add_primitive_type(const char *name, List type)
     type.tag = tag_type;
     
     size_t name_len = strlen(name);
-    set_Variable_insert(&g_ctx->variables, (Variable){
+    set_insert(&g_ctx->variables, ((Variable){
         .name = (List){
             .tag = tag_symbole,
             .size = name_len,
@@ -113,5 +113,5 @@ void add_primitive_type(const char *name, List type)
         },
         .value = type,
         .type = TYPE_TYPE
-    });
+    }));
 }

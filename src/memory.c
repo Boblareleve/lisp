@@ -45,7 +45,7 @@ void *List_alloc(size_t count)
     
     trigger_gc();
 
-    set_void_ptr_insert(&g_ctx->gc, mem);
+    set_insert(&g_ctx->gc, mem);
     g_ctx->euristics.allocs_count++;
     return mem;
 }
@@ -60,7 +60,7 @@ void *List_delc_alloc(void *ptr, size_t count)
     
     trigger_gc();
 
-    set_void_ptr_insert(&g_ctx->gc, ptr);
+    set_insert(&g_ctx->gc, ptr);
     g_ctx->euristics.allocs_count++;
     return ptr;
 }
@@ -89,11 +89,11 @@ void gc_traverse_mark(List li)
         void *ptr = List_get_ptr(li);
         if (!ptr) return; // if not something allocated return
         
-        void **f = set_void_ptr_get(&g_ctx->gc, ptr);
+        void **f = set_get(&g_ctx->gc, ptr);
         if (!f)
         {
 #ifdef FSAN
-            if (!set_void_ptr_contains(&g_ctx->gc, gc_tag(ptr)))
+            if (!set_contains(&g_ctx->gc, gc_tag(ptr)))
             {
                 // intentional double free to trigger fsan
                 // char dumb = *(char*)ptr;
@@ -102,7 +102,7 @@ void gc_traverse_mark(List li)
                 // (void)dumb;
             }
 #endif
-            assert(set_void_ptr_contains(&g_ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
+            assert(set_contains(&g_ctx->gc, gc_tag(ptr))); // check if the value was already poisoned if not the allocation wasn't reported as it should
             return; // if it was not found -> already poisoned
         }
         
@@ -118,30 +118,6 @@ void gc_traverse_mark(List li)
         for (int i = 0; i < li.size; i++)
             gc_traverse_mark(li.list[i]);
 }
-
-
-
-// bool set_##TK##_erase(set_##TK *obj, TK val)
-// {
-//     const int index_erase = _set_##TK##_where(obj, val);
-//     if (IS_NULL(obj->arr[index_erase]))
-//         return false;
-//     SET_NULL(obj->arr[index_erase]);
-//     obj->size--;
-//     
-//     int it = (index_erase + 1) % obj->capacity;
-//     while (!IS_NULL(obj->arr[it]))
-//     { /* if it is already at the good place there still could be miss place element after and reinsert it is trivial */
-//         int hash = _set_##TK##_where(obj, obj->arr[it]);
-//         if (it != hash)
-//         {
-//             obj->arr[hash] = obj->arr[it];
-//             SET_NULL(obj->arr[it]);
-//         }
-//         it = (it + 1) % obj->capacity;
-//     }
-//     return true;
-// }
 
 void erase_untag(set_void_ptr *gc)
 {

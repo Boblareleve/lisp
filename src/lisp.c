@@ -35,7 +35,7 @@ Variable *get_local_Variable(List name)
 Variable *get_global_Variable(List name)
 {   
     TRY(name.tag == tag_symbole);
-    return set_Variable_get(&g_ctx->variables, (Variable){ .name = name });
+    return set_get(&g_ctx->variables, (Variable){ .name = name });
 }
 
 Variable *get_Variable(List name)
@@ -67,7 +67,7 @@ bool global_Variable(Variable var)
 {
     TRY(var.name.tag == tag_symbole);
     // set or replace variable var.name
-    Variable *old = set_Variable_emplace(&g_ctx->variables, var);
+    Variable *old = set_emplace(&g_ctx->variables, var);
     if (!VAR_IS_NULL(*old))
         return false;
     *old = var;
@@ -457,7 +457,7 @@ void List_free(List li)
 set_void_ptr add_to_gc_context(set_void_ptr gc, List root)
 {
     if (List_get_ptr(root))
-        set_void_ptr_insert(&gc, List_get_ptr(root));
+        set_insert(&gc, List_get_ptr(root));
 
     if (root.tag == tag_list)
         for (int i = 0; i < root.size; i++)
@@ -533,7 +533,7 @@ void Lisp_context_free(void)
         da_free(&g_ctx->stack);
         da_free(&g_ctx->vm_stack);
         
-        set_Variable_free(&g_ctx->variables);
+        set_free(&g_ctx->variables);
         g_ctx->root = NIL_LIST;
     }
 
@@ -541,7 +541,7 @@ void Lisp_context_free(void)
     garbage_collector();
 
     da_free(&g_ctx->paths);
-    set_void_ptr_free(&g_ctx->gc);
+    set_free(&g_ctx->gc);
     Strb_free(g_ctx->error);
     free(g_ctx);
 

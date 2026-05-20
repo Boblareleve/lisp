@@ -82,6 +82,11 @@ DA_TYPEDEF_ARRAY(da_Variable);
 SET_TYPEDEF_HASH_SET(Variable); // global variable and functions
 
 
+typedef void *void_ptr;
+SET_TYPEDEF_HASH_SET(void_ptr); // gc
+
+
+#define SET_LIST_SETS void_ptr, Variable, Primitive
 
 // 
 
@@ -116,9 +121,6 @@ struct Variable
     List value;
 };
 
-
-typedef void *void_ptr;
-SET_TYPEDEF_HASH_SET(void_ptr); // gc
 
 
 typedef struct Lisp_context
@@ -156,6 +158,8 @@ typedef struct Lisp_context
 } Lisp_context;
 
 
+typedef struct Primitive Primitive;
+SET_TYPEDEF_HASH_SET(Primitive);
 
 // VM
 
@@ -246,6 +250,13 @@ List List_copy(const List li);
 Lisp_context *Lisp_context_init(List root);
 void set_Lisp_context(Lisp_context *ctx);
 void Lisp_context_free(void);
+
+size_t local_Variable(Variable var);
+// bool mutate_Variable(Variable var);
+bool global_Variable(Variable var);
+Variable *get_Variable(List name);
+Variable *get_local_Variable(List name);
+
 
 // memory.c
 void *List_alloc(size_t count);
