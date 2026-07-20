@@ -94,12 +94,12 @@ int __main(int argc, char **argv)
         Strb raw = {0};
         if (Strb_cat_file(&raw, argv[i]))
         {
-            fprintf(fd, "[TEST] file '%s' not found\n", argv[i]);
+            fprintf(fd, "[TEST %d] file '%s' not found\n", i, argv[i]);
             Strb_free(raw);
             continue ;
         }
         
-        fprintf(fd, "TEST %-*s\t", 48, argv[i]);
+        fprintf(fd, "[TEST %d] %-*s\t", i, 48, argv[i]);
         fflush(fd);
         if (!_test(raw.view))
             fprintf(fd, "\tFAILURE\n");
@@ -227,6 +227,7 @@ bool test(const Strv str)
     return true;
 }
 
+// int tests(int argc, char **argv)
 int main(int argc, char **argv)
 {
     init_primitive_map();
@@ -238,12 +239,12 @@ int main(int argc, char **argv)
         Strb raw = {0};
         if (Strb_cat_file(&raw, argv[i]))
         {
-            fprintf(fd, "[TEST] file '%s' not found\n", argv[i]);
+            fprintf(fd, "[TEST %d] file '%s' not found\n", i, argv[i]);
             Strb_free(raw);
             continue ;
         }
         
-        fprintf(fd, "TEST %-*s\t", 64, argv[i]);
+        fprintf(fd, "[TEST %d] %-*s\t", i, 64, argv[i]);
         fflush(fd);
         
         int samples_count = 1;
@@ -271,6 +272,18 @@ int main(int argc, char **argv)
     return 0;
 }
 
+
+// int main(int argc, char **argv)
+// {
+//     if (argc <= 1) return 1;
+//     switch (argv[1])
+//     {
+//     case 't': return tests(argc-1, argv+1);
+//     case 'c': return run(argc-1, argv+1);
+//     default: return 1;
+//     }
+//     return 0;
+// }
 
 
 /* #include <dlfcn.h>

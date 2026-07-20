@@ -110,7 +110,7 @@ List escaping(Strv str)
         0
     );
 
-    for (int i = 0; i < str.size; i++)
+    for (size_t i = 0; i < str.size; i++)
     {
         if (str.arr[i] == '\\')
         {

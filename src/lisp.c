@@ -97,19 +97,18 @@ static inline bool push_stack_frame(bool is_macro)
 }
 
 // push a marker to pop to (do linear search as it can be mouved)
-static inline bool pop_stack_frame(bool is_macro)
+static inline void pop_stack_frame(bool is_macro)
 {
-    TODO("");
+    // TODO("");
     assert(g_ctx);
+
     do {
-        TRY(g_ctx->frame_start > 0, error_log("try to return from root stack frame"));
+        assert(g_ctx->frame_start > 0 && "try to return from root stack frame");
         g_ctx->stack.size = g_ctx->frame_start-1;
         g_ctx->frame_start = g_ctx->stack.arr[g_ctx->stack.size].value.integer;
 
     } while (g_ctx->stack.arr[g_ctx->stack.size].value.tag
             == (!is_macro ? ttag_macro : ttag_frame));
-
-    return true;
 }
 
 static inline bool handel_return_break(const int vm_stack_sp, bool is_macro)
@@ -256,9 +255,10 @@ bool eval_function(void)
     VM_top2 = VM_top1.list[VM_top1.size-1]; // ¿return?
     VM_pop;
     if (!eval()) return handel_return_break(vm_stack_sp, is_macro);
+
     TRY(is_of_type(VM_top1, return_type), pop_stack_frame(is_macro); error_log("function return unexpected type"));
     
-    TRY(pop_stack_frame(is_macro));
+    pop_stack_frame(is_macro);
     return true;
 }
 
